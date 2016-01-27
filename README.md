@@ -19,7 +19,7 @@ The current version of MultiVoteListener comes with the following features:
 
 ## Build & Install
 
-*Requires:* 	 Votifier, Vault
+*Requires:* 	 Votifier, Vault  
 *Can hook into:* PlayerPoints
 
 
