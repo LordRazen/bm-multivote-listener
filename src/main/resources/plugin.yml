@@ -1,0 +1,14 @@
+name: MultiVoteListener
+author: Asgarioth
+version: 0.9.1
+main: de.asgarioth.MultiVoteListener.MultiVoteListener
+description: Multiple Service Vote Listener for Votifier
+
+authors: [ Asgarioth ]
+depend: [ Votifier, Vault ]
+softdepend: [ PlayerPoints ]
+
+commands:
+   mvote:
+     description: MultiVoteListener Command Interface
+     usage: /mvote
