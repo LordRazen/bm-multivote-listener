@@ -20,14 +20,12 @@ The current version of MultiVoteListener comes with the following features:
 ## Build & Install
 
 *Requires:* 	 Votifier, Vault
+
 *Can hook into:* PlayerPoints
 
 
 **todo** build instructions
 
-Deploy the jar file into the plugins folder
-(Re)start your server
-Modify config according to your needs
 
 ## Configuration
 
