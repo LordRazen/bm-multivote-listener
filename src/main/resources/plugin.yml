@@ -1,6 +1,6 @@
 name: MultiVoteListener
 author: Asgarioth
-version: 0.9.1
+version: 1.0.1
 main: de.asgarioth.MultiVoteListener.MultiVoteListener
 description: Multiple Service Vote Listener for Votifier
 

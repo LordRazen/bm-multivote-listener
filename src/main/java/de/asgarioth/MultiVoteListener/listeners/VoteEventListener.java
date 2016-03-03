@@ -71,6 +71,8 @@ public class VoteEventListener implements Listener {
 		boolean knownService = false;
 		boolean defaultService = false;
 		
+		boolean userMessage = false;
+		
 		OfflinePlayer user;
 
 		Vote vote = e.getVote();
@@ -132,6 +134,9 @@ public class VoteEventListener implements Listener {
 		// try to fetch UUID
 		user = Bukkit.getServer().getOfflinePlayer(username);
 		
+		if(plugin.getConfig().isSet("services."+serviceId+".usermessage") ) {
+			userMessage = true;
+		}
 		
 		// Compose a broadcast-message
 		broadcast = Tools.reformatColorCodes(plugin.getConfig().getString("message_prefix")+plugin.getConfig().getString("messages.broadcast_vote_success"));
@@ -146,27 +151,33 @@ public class VoteEventListener implements Listener {
 		
 		// Check if the player is known on the server.
 		// If not, do nothing...
-		if(!user.hasPlayedBefore()) {
+		if(!user.hasPlayedBefore() && !user.isOnline()) {
 			if(plugin.getConfig().getBoolean("allow_fake_names")) {
 				//Bukkit.getServer().spigot().broadcast(spigotBroadcast);
 				broadcast(broadcast,serviceUrl);
 			}
+			System.out.println("Unknown user voted on "+serviceUrl+": " + user.getName());
 			return;
 		}
 		else {
 			// broadcast
 			//Bukkit.getServer().spigot().broadcast(spigotBroadcast);
 			broadcast(broadcast,serviceUrl);
-
-			// Player thx message
-			message = Tools.reformatColorCodes(plugin.getConfig().getString("message_prefix")+plugin.getConfig().getString("messages.player_vote_success"));
-			message = message.replaceAll("%name%", username);
-			message = message.replaceAll("%service%", service);
-			message = message.replaceAll("%amount%", ""+money_reward);
 			
+			// General thx message + usermessage if defined for service
 			if(user.isOnline()) {
+				// Player thx message
+				message = Tools.reformatColorCodes(plugin.getConfig().getString("message_prefix")+plugin.getConfig().getString("messages.player_vote_success"));
+				message = message.replaceAll("%name%", username);
+				message = message.replaceAll("%service%", service);
+				message = message.replaceAll("%amount%", ""+money_reward);
 				Player.class.cast(user).sendMessage(message);
-			}
+				if(userMessage) {
+					message = Tools.reformatColorCodes(plugin.getConfig().getString("message_prefix")+plugin.getConfig().getString("services."+serviceId+".usermessage"));
+					Player.class.cast(user).sendMessage(message);
+				}
+			}			
+			message = "";
 			
 			// vault action
 			if(plugin.isEnabledVaultEco()) {
@@ -177,7 +188,7 @@ public class VoteEventListener implements Listener {
 					message = message.replaceAll("%name%", username);
 					message = message.replaceAll("%service%", service);
 					message = message.replaceAll("%amount%", ""+money_reward);
-					if(user.isOnline()) {
+					if(user.isOnline() && message.length() > 1 && !userMessage) {
 						Player.class.cast(user).sendMessage(message);						
 					}
 					message = Tools.stripColorCodes(plugin.getConfig().getString("message_prefix")) + "Service: "+service+"/Player: " + username + " - Vault transaction: +"+ money_reward;
@@ -193,7 +204,7 @@ public class VoteEventListener implements Listener {
 				message = message.replaceAll("%name%", username);
 				message = message.replaceAll("%service%", service);
 				message = message.replaceAll("%amount%", ""+points_reward);
-				if(user.isOnline()) {
+				if(user.isOnline() && message.length() > 1 && !userMessage) {
 					Player.class.cast(user).sendMessage(message);	
 				}
 				message = Tools.stripColorCodes(plugin.getConfig().getString("message_prefix")) +  "Service: "+service+"/Player: " + username + " - PlayerPoints: +"+ points_reward;
@@ -210,7 +221,9 @@ public class VoteEventListener implements Listener {
 				message = message.replaceAll("%name%", username);
 				message = message.replaceAll("%service%", service);
 				message = message.replaceAll("%amount%", "");
-				Player.class.cast(user).sendMessage(message);
+				if(user.isOnline() && message.length() > 1 && !userMessage) {
+					Player.class.cast(user).sendMessage(message);
+				}
 				message = Tools.stripColorCodes(plugin.getConfig().getString("message_prefix")) +  "Service: "+service+"/Player: " + username + " - Healed";
 				System.out.println(message);
 				message = "";

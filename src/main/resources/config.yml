@@ -38,11 +38,12 @@ messages:
 #   default:
 #     [...]
 #   service0:
-#     name: 'some name'		--> used to identify vote service & as a replacement for %service% in messages+commands
-#     url: 'url'			--> If a valid URL is provided, the broadcast message will be clickable
-#     enabled: true			--> Enable/disable the service
-#     money: 100			--> amount of money (requires Vault)
-#     points: 1				--> amount of points (requires PlayerPoints)
+#     name: 'some name'	  --> used to identify vote service & as a replacement for %service% in messages+commands
+#     url: 'url'			    --> If a valid URL is provided, the broadcast message will be clickable
+#     usermessage:        -->'Some Text' --> If usermessage is set for service, player_*_reward messages will be suppressed
+#     enabled: true			  --> Enable/disable the service
+#     money: 100			    --> amount of money (requires Vault)
+#     points: 1				    --> amount of points (requires PlayerPoints)
 #     heal:	[true/false]	--> Heals/feeds the player if online
 #     online_commands:		--> Executed, if player is online
 #       - [cmd1]
@@ -50,7 +51,7 @@ messages:
 #       - [cmd2]
 #   service1:
 #     [...]
-#   default:				--> If defined and enable_default is true this is used if no matching service was found
+#   default:				      --> If defined and enable_default is true this is used if no matching service was found
 #     [...]
 #
 # Config can be updated after changing it by issuing the "/mvote reload" command.
