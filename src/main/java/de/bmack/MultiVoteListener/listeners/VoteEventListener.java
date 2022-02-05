@@ -1,22 +1,20 @@
-package de.asgarioth.MultiVoteListener.listeners;
+package de.bmack.MultiVoteListener.listeners;
 
 import java.lang.reflect.Method;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
-import de.asgarioth.MultiVoteListener.MultiVoteListener;
-import de.asgarioth.MultiVoteListener.Tools;
-//import net.md_5.bungee.api.chat.ClickEvent;
-//import net.md_5.bungee.api.chat.TextComponent;
+import de.bmack.MultiVoteListener.MultiVoteListener;
+import de.bmack.MultiVoteListener.Tools;
 
+import de.bmack.MultiVoteListener.UrlBroadcast;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
-import org.bukkit.plugin.Plugin;
 
 import com.vexsoftware.votifier.model.VotifierEvent;
 import com.vexsoftware.votifier.model.Vote;
@@ -26,7 +24,7 @@ import com.vexsoftware.votifier.model.Vote;
  * 
  * The listener will catch and handle VotifierEvents.
  * 
- * @author		Asgarioth
+ * @author		bmack94
  */ 
 public class VoteEventListener implements Listener {
 
@@ -263,16 +261,14 @@ public class VoteEventListener implements Listener {
      * 
      * @param		message
      * @param		url
-     * @see			de.asgarioth.MultiVoteListener.UrlBroadcast
+     * @see			de.bmack.MultiVoteListener.UrlBroadcast
      */ 
 	public void broadcast(String message, String url) {
 		if(plugin.isSpigot()) {
 			try {
-				Class urlBC = Class.forName("de.asgarioth.MultiVoteListener.UrlBroadcast");
-				Method bcMth = urlBC.getMethod("doBroadcast", MultiVoteListener.class, String.class, String.class);
-				bcMth.invoke(null,this.plugin, message, url);
+				UrlBroadcast.doBroadcast(plugin, message, url);
 			}
-			catch (ReflectiveOperationException cnfe) {
+			catch (NullPointerException cnfe) {
 				System.out.println(cnfe.getMessage());
 				cnfe.printStackTrace(System.out);
 				plugin.getServer().broadcastMessage(message);

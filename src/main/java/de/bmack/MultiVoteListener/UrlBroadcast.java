@@ -1,4 +1,4 @@
-package de.asgarioth.MultiVoteListener;
+package de.bmack.MultiVoteListener;
 
 import net.md_5.bungee.api.chat.TextComponent;
 import net.md_5.bungee.api.chat.ClickEvent;
@@ -7,7 +7,7 @@ import net.md_5.bungee.api.chat.ClickEvent;
  * This class is loaded on demand using reflection. You should not invoke this directly!
  * It will not work on non-Spigot servers.
  * 
- * @author		Asgarioth
+ * @author		bmack94
  * @see			net.md_5.bungee.api.chat
  */
 public class UrlBroadcast {

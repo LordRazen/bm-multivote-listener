@@ -60,7 +60,7 @@ messages:
 services:
   default:
     name: 'multivote_default'
-    url: 'http://www.asgarioth.de'
+    url: 'http://bmack.de'
     enabled: true
     money: 150
     points: 1

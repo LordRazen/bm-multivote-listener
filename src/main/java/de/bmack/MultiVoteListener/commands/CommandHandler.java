@@ -1,20 +1,22 @@
-package de.asgarioth.MultiVoteListener.commands;
+package de.bmack.MultiVoteListener.commands;
 
 import java.util.Iterator;
 import java.util.List;
+import java.util.Objects;
 
+import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
-import de.asgarioth.MultiVoteListener.MultiVoteListener;
-import de.asgarioth.MultiVoteListener.Tools;
+import de.bmack.MultiVoteListener.MultiVoteListener;
+import de.bmack.MultiVoteListener.Tools;
 
 /**
  * Implements a CommandExecutor
  * 
- * @author		Asgarioth
+ * @author		bmack94
  * @see			org.bukkit.command.CommandExecutor
  */
 public class CommandHandler implements CommandExecutor {
@@ -38,7 +40,7 @@ public class CommandHandler implements CommandExecutor {
 	public boolean onCommand(CommandSender sender, Command cmd, String commandLabel, String[] args) {
         // Do nothing if sender is not OP or has appropriate permission
 		if(plugin.isEnabledVaultPerm()) {
-			if (!(sender.isOp() || plugin.getPermAPI().has(sender,"mvote.admin"))) return true;	
+			if (!(sender.isOp() || Objects.requireNonNull(Bukkit.getPlayer(String.valueOf(sender))).hasPermission("mvote.admin"))) return true;
 		}
 		else {
 			if (!(sender.isOp() || sender.hasPermission("mvote.admin"))) return true;
@@ -48,25 +50,26 @@ public class CommandHandler implements CommandExecutor {
 		// Handle /mvote command
         if (cmd.getName().toLowerCase().equals("mvote")) {
             if (args.length > 0) {
-                if (args[0].equals("reload")) {
-                	try {
-                		plugin.reloadConfig();
-                		commandResponse(sender,"&4Config reloaded.");	
-                	}
-                	catch(Exception e) {
-                		System.out.println("[MultiVoteListener] Error in config. Plugin will not be enabled");
-                		commandResponse(sender,"&4Error in your config file.");
-                	}
-                } 
-                else if(args[0].equals("status")) {
-                	commandResponse(sender, Tools.getStatus(plugin));
-                }
-                else if(args[0].equals("services")) {
-                	commandResponse(sender, Tools.getServices(plugin));
-                }
-                else {
-                	commandResponse(sender,Tools.getUsage());
-                }
+				switch (args[0]) {
+					case "reload":
+						try {
+							plugin.reloadConfig();
+							commandResponse(sender, "&4Config reloaded.");
+						} catch (Exception e) {
+							System.out.println("[MultiVoteListener] Error in config. Plugin will not be enabled");
+							commandResponse(sender, "&4Error in your config file.");
+						}
+						break;
+					case "status":
+						commandResponse(sender, Tools.getStatus(plugin));
+						break;
+					case "services":
+						commandResponse(sender, Tools.getServices(plugin));
+						break;
+					default:
+						commandResponse(sender, Tools.getUsage());
+						break;
+				}
             } 
             else {
             	commandResponse(sender,Tools.getUsage());

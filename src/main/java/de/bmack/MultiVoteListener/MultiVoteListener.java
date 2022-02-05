@@ -1,28 +1,26 @@
-package de.asgarioth.MultiVoteListener;
+package de.bmack.MultiVoteListener;
 
 import java.io.File;
 
+import de.bmack.MultiVoteListener.utils.Logger;
+import org.bukkit.permissions.Permission;
 import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.Bukkit;
 import org.bukkit.configuration.file.FileConfiguration;
 
 import net.milkbowl.vault.economy.Economy;
-import net.milkbowl.vault.permission.Permission;
 
 import org.black_ixx.playerpoints.PlayerPoints;
 import org.black_ixx.playerpoints.PlayerPointsAPI;
 
-//import com.avaje.ebean.enhance.asm.commons.Method;
-
-
-import de.asgarioth.MultiVoteListener.commands.CommandHandler;
-import de.asgarioth.MultiVoteListener.listeners.VoteEventListener;
+import de.bmack.MultiVoteListener.commands.CommandHandler;
+import de.bmack.MultiVoteListener.listeners.VoteEventListener;
 
 /**
  * Main class of the MultiVotePlugin
  * 
- * @author 		Asgarioth
+ * @author 		bmack94
  */
 public class MultiVoteListener extends JavaPlugin {
 
@@ -36,7 +34,6 @@ public class MultiVoteListener extends JavaPlugin {
 	private boolean isSpigot = false;
 	
     private Economy economy = null;
-    private Permission permission = null;
     private PlayerPoints points = null;
 	
 	// Our listeners
@@ -64,25 +61,15 @@ public class MultiVoteListener extends JavaPlugin {
 		    	if (economyProvider != null) {
 		    		economy = economyProvider.getProvider();
 		    		enableVaultEco = true;
-		    		System.out.println(Tools.stripColorCodes(getConfig().getString("message_prefix")) + "SoftDependency: Vault - Economy hook found.");
+		    		Logger.info(Tools.stripColorCodes(getConfig().getString("message_prefix")) + "SoftDependency: Vault - Economy hook found.");
 		    	}
 		    	else {
 		    		enableVaultEco = false;
-		    		System.out.println(Tools.stripColorCodes(getConfig().getString("message_prefix")) + "SoftDependency: Vault - not found. money reward disabled.");
-		    	}
-		        RegisteredServiceProvider<Permission> permissionProvider = Bukkit.getServer().getServicesManager().getRegistration(net.milkbowl.vault.permission.Permission.class);
-		        if (permissionProvider != null) {
-		            permission = permissionProvider.getProvider();
-		            enableVaultPerm = true;
-		            System.out.println(Tools.stripColorCodes(getConfig().getString("message_prefix")) + "SoftDependency: Vault - Permission hook found.");
-		        }
-		        else {
-		        	enableVaultPerm = false;
-		        	System.out.println(Tools.stripColorCodes(getConfig().getString("message_prefix")) + "SoftDependency: Vault - not found. money reward disabled.");
+					Logger.info(Tools.stripColorCodes(getConfig().getString("message_prefix")) + "SoftDependency: Vault - not found. money reward disabled.");
 		    	}
 	    	}
 	    	else {
-	    		System.out.println(Tools.stripColorCodes(getConfig().getString("message_prefix")) + "Dependency: Vault - not found. Disabling MultiVoteListener.");
+				Logger.info(Tools.stripColorCodes(getConfig().getString("message_prefix")) + "Dependency: Vault - not found. Disabling MultiVoteListener.");
 		    	this.getServer().getPluginManager().disablePlugin(this);
 		    	return;
 	    	}
@@ -92,11 +79,11 @@ public class MultiVoteListener extends JavaPlugin {
 		    	points = PlayerPoints.class.cast(this.getServer().getPluginManager().getPlugin("PlayerPoints"));
 		    	if(points != null) {
 		    		enablePlayerPoints = true;
-		    		System.out.println(Tools.stripColorCodes(getConfig().getString("message_prefix")) + "SoftDependency: PlayerPoints - found.");
+					Logger.info(Tools.stripColorCodes(getConfig().getString("message_prefix")) + "SoftDependency: PlayerPoints - found.");
 		    	}
 	    	}
 	    	else {
-	    		System.out.println(Tools.stripColorCodes(getConfig().getString("message_prefix")) + "SoftDependency: PlayerPoints - not found. points reward disabled.");	    	
+				Logger.info(Tools.stripColorCodes(getConfig().getString("message_prefix")) + "SoftDependency: PlayerPoints - not found. points reward disabled.");
 	    	}
 	    	
 	       // Check if server is Spigot
@@ -107,12 +94,12 @@ public class MultiVoteListener extends JavaPlugin {
 				isSpigot = true;
 			}
 			catch (NoSuchMethodException cfne) {
-				System.out.println(Tools.stripColorCodes(getConfig().getString("message_prefix")) + "Running on CraftBukkit");
+				Logger.info(Tools.stripColorCodes(getConfig().getString("message_prefix")) + "Running on CraftBukkit");
 			}
 			catch (ClassNotFoundException cnfe) {
 				// This condition should not be met at all.
 				// The plugin should instantly crash due to missing Bukkit-API
-				System.out.println(Tools.stripColorCodes(getConfig().getString("message_prefix")) + "No bukkit found at all - disabling");
+				Logger.info(Tools.stripColorCodes(getConfig().getString("message_prefix")) + "No bukkit found at all - disabling");
 		    	this.getServer().getPluginManager().disablePlugin(this);
 		    	return;
 			}
@@ -134,7 +121,7 @@ public class MultiVoteListener extends JavaPlugin {
     		//this.config = YamlConfiguration.loadConfiguration(new File(getDataFolder(), "config.yml"));	
     	}
     	catch(Exception e) {
-    		System.out.println("[MultiVoteListener] Error in config. Plugin will not be enabled");
+			Logger.info("[MultiVoteListener] Error in config. Plugin will not be enabled");
     		return false;
     	}
     	return true;
@@ -150,17 +137,6 @@ public class MultiVoteListener extends JavaPlugin {
     public Economy getEcoAPI() {
     	return this.economy;
     }
-    
-    /**
-     * Returns the Vault API - Permissions used by MultiVoteListener.
-     * 
-     * @return Vault Instance or null, if Vault is not active
-     * @see    net.milkbowl.vault.economy.Economy
-     */
-    public Permission getPermAPI() {
-    	return this.permission;
-    }
-    
     
     /**
      * Returns the Vault API used by MultiVoteListener.

@@ -1,10 +1,11 @@
 name: MultiVoteListener
-author: Asgarioth
-version: 1.0.1
-main: de.asgarioth.MultiVoteListener.MultiVoteListener
+author: bmack94
+version: ${project.version}
+main: de.bmack.MultiVoteListener.MultiVoteListener
 description: Multiple Service Vote Listener for Votifier
+api-version: 1.18
 
-authors: [ Asgarioth ]
+authors: [ bmack94 ]
 depend: [ Votifier, Vault ]
 softdepend: [ PlayerPoints ]
 

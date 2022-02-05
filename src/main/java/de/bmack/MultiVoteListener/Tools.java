@@ -1,4 +1,4 @@
-package de.asgarioth.MultiVoteListener;
+package de.bmack.MultiVoteListener;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -8,7 +8,7 @@ import java.util.Set;
 /**
  * Static helper methods
  * 
- * @author 		Asgarioth
+ * @author 		bmack94
  */
 public class Tools {
 	/**
