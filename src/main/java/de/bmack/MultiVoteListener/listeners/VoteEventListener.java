@@ -18,6 +18,8 @@ import org.bukkit.event.Listener;
 
 import com.vexsoftware.votifier.model.VotifierEvent;
 import com.vexsoftware.votifier.model.Vote;
+import com.earth2me.essentials.User;
+import com.earth2me.essentials.Essentials;
 
 /**
  * Listener implementation for Vote Events.
@@ -130,7 +132,10 @@ public class VoteEventListener implements Listener {
 		}
 
 		// try to fetch UUID
-		user = Bukkit.getServer().getOfflinePlayer(username);
+		user = Bukkit.getOfflinePlayer(username);
+		Essentials ess = (Essentials) Bukkit.getServer()
+                .getPluginManager().getPlugin("Essentials");
+		User essUser = ess.getUser(username);
 		
 		if(plugin.getConfig().isSet("services."+serviceId+".usermessage") ) {
 			userMessage = true;
@@ -149,7 +154,7 @@ public class VoteEventListener implements Listener {
 		
 		// Check if the player is known on the server.
 		// If not, do nothing...
-		if(!user.hasPlayedBefore() && !user.isOnline()) {
+/*		if(!user.hasPlayedBefore() && !user.isOnline()) {
 			if(plugin.getConfig().getBoolean("allow_fake_names")) {
 				//Bukkit.getServer().spigot().broadcast(spigotBroadcast);
 				broadcast(broadcast,serviceUrl);
@@ -157,7 +162,7 @@ public class VoteEventListener implements Listener {
 			System.out.println("Unknown user voted on "+serviceUrl+": " + user.getName());
 			return;
 		}
-		else {
+		else {*/
 			// broadcast
 			//Bukkit.getServer().spigot().broadcast(spigotBroadcast);
 			broadcast(broadcast,serviceUrl);
@@ -196,7 +201,9 @@ public class VoteEventListener implements Listener {
 			}
 			// player points action
 			if(plugin.isEnabledPoints() && points_reward > 0) {
-				plugin.getPointsAPI().give(user.getUniqueId(), points_reward);
+				
+				
+				plugin.getPointsAPI().give(essUser.getUUID(), points_reward);
 				
 				message = Tools.reformatColorCodes(plugin.getConfig().getString("message_prefix")+plugin.getConfig().getString("messages.player_points_reward"));
 				message = message.replaceAll("%name%", username);
@@ -247,7 +254,7 @@ public class VoteEventListener implements Listener {
 					message = "";
 				}
 			}
-		}
+		//}
 		return;
 	}
 	
