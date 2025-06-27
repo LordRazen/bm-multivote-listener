@@ -5,6 +5,9 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.LocalDate;
+import java.time.Month;
+import java.time.YearMonth;
 
 import de.bmack.MultiVoteListener.utils.Logger;
 import org.bukkit.permissions.Permission;
@@ -12,6 +15,10 @@ import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.Bukkit;
 import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.entity.Player;
+import net.luckperms.api.LuckPerms;
+import net.luckperms.api.model.user.User;
+import net.luckperms.api.node.Node;
 
 import net.milkbowl.vault.economy.Economy;
 
@@ -49,6 +56,22 @@ public class MultiVoteListener extends JavaPlugin {
      */    
 	@Override
     public void onEnable() {
+
+
+		LocalDate today = LocalDate.now();
+
+
+		if (today.getDayOfMonth() == 1) {
+			YearMonth vorherigerMonat = YearMonth.from(today.minusMonths(1));
+
+			int tage = vorherigerMonat.lengthOfMonth();
+
+			// Führe spezifische Logik aus
+
+
+
+
+		}
 
 
 		config = getConfig();
@@ -223,4 +246,12 @@ public class MultiVoteListener extends JavaPlugin {
     public boolean isSpigot() {
     	return isSpigot;
     }
+
+	public void givePermissionLuckPerms(Player player, LuckPerms luckPerms) {
+		User user = luckPerms.getUserManager().getUser(player.getUniqueId());
+		if (user != null) {
+			user.data().add(Node.builder("meine.permission.name").value(true).build());
+			luckPerms.getUserManager().saveUser(user);
+		}
+	}
 }
