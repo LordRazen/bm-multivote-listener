@@ -13,6 +13,14 @@ allow_fake_names: true
 # Self-explanatory, isn't it? ^^
 message_prefix: '&6[&4MultiVoteListener&6] '
 
+# Database config
+database:
+  host: "127.0.0.1"
+  port: 3306
+  name: "blockminers_server"
+  user: "root"
+  password: "test"
+
 #
 # player_vote_success    - Message sent to the player that voted for the server
 # player_money_reward    - Message sent to the player when money has been credited to his account

@@ -1,9 +1,13 @@
 package de.bmack.MultiVoteListener.listeners;
 
 import java.lang.reflect.Method;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 
 import de.bmack.MultiVoteListener.MultiVoteListener;
 import de.bmack.MultiVoteListener.Tools;
@@ -20,6 +24,8 @@ import com.vexsoftware.votifier.model.VotifierEvent;
 import com.vexsoftware.votifier.model.Vote;
 import com.earth2me.essentials.User;
 import com.earth2me.essentials.Essentials;
+
+import static de.bmack.MultiVoteListener.MultiVoteListener.connection;
 
 /**
  * Listener implementation for Vote Events.
@@ -181,6 +187,22 @@ public class VoteEventListener implements Listener {
 				}
 			}			
 			message = "";
+
+			//Logging to Database
+			String voter = (username);
+			UUID voteruuid = user.getUniqueId();
+			String UUIDString = voteruuid.toString();
+
+			try (PreparedStatement stmt = connection.prepareStatement(
+					"INSERT INTO votes (uuid, username, votesite) VALUES (?, ?, ?)"
+			)) {
+				stmt.setString(1, UUIDString);
+				stmt.setString(2, voter);
+				stmt.setString(3, service);
+				stmt.executeUpdate();
+			} catch (SQLException exception) {
+				exception.printStackTrace();
+			}
 			
 			// vault action
 			if(plugin.isEnabledVaultEco()) {

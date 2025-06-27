@@ -1,6 +1,10 @@
 package de.bmack.MultiVoteListener;
 
 import java.io.File;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+import java.sql.Statement;
 
 import de.bmack.MultiVoteListener.utils.Logger;
 import org.bukkit.permissions.Permission;
@@ -24,6 +28,7 @@ import de.bmack.MultiVoteListener.listeners.VoteEventListener;
  */
 public class MultiVoteListener extends JavaPlugin {
 
+	public static Connection connection;
 	public FileConfiguration config;
 
 	// Soft depend indicators and instances
@@ -44,6 +49,38 @@ public class MultiVoteListener extends JavaPlugin {
      */    
 	@Override
     public void onEnable() {
+
+
+		config = getConfig();
+		String host = config.getString("database.host");
+		int port = config.getInt("database.port");
+		String dbName = config.getString("database.name");
+		String user = config.getString("database.user");
+		String password = config.getString("database.password");
+		try {
+			connection = DriverManager.getConnection(
+					"jdbc:mysql://" + host + ":" + port + "/" + dbName + "?useSSL=false&autoReconnect=true",
+					user,
+					password
+			);
+			Logger.info("[MultiVoteListener] Connection to Database established!");
+
+			// Create the mails table if it doesn't exist
+			String createTableSQL = "CREATE TABLE IF NOT EXISTS votes (" +
+					"id INT(11) NOT NULL AUTO_INCREMENT," +
+					"date DATE NOT NULL DEFAULT CURRENT_TIMESTAMP ," +
+					"time TIME NOT NULL DEFAULT CURRENT_TIMESTAMP ," +
+					"uuid VARCHAR(36) NOT NULL ," +
+					"username VARCHAR(36) NOT NULL ," +
+					"votesite TEXT NOT NULL , PRIMARY KEY (`id`)" +
+					")";
+			try (Statement stmt = connection.createStatement()) {
+				stmt.execute(createTableSQL);
+			}
+		} catch (SQLException e) {
+			e.printStackTrace();
+			Logger.info("[MultiVoteListener] No Connection to Database!");
+		}
 
 	       if (!new File(getDataFolder(), "config.yml").exists()) {
 	            saveResource("config.yml", false);
@@ -113,20 +150,20 @@ public class MultiVoteListener extends JavaPlugin {
      * Load config file from disk.
      * The method handles exceptions that may occur during file load using getConfig()
      * @return		true if config has benn loaded, false on error.
-     */    
-    public boolean loadConfig() {
-    	//TODO: Handle invalid configuation file exception
-    	try {
-    		getConfig();
-    		//this.config = YamlConfiguration.loadConfiguration(new File(getDataFolder(), "config.yml"));	
-    	}
-    	catch(Exception e) {
+     */
+	public boolean loadConfig() {
+		//TODO: Handle invalid configuation file exception
+		try {
+			getConfig();
+			//this.config = YamlConfiguration.loadConfiguration(new File(getDataFolder(), "config.yml"));
+		}
+		catch(Exception e) {
 			Logger.info("[MultiVoteListener] Error in config. Plugin will not be enabled");
-    		return false;
-    	}
-    	return true;
-        
-    }
+			return false;
+		}
+		return true;
+
+	}
     
     /**
      * Returns the Vault API - Economy used by MultiVoteListener.
