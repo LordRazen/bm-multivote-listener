@@ -12,6 +12,8 @@ import java.util.UUID;
 
 import de.bmack.MultiVoteListener.utils.Logger;
 import org.bukkit.OfflinePlayer;
+import org.bukkit.command.CommandSender;
+import org.bukkit.entity.Player;
 import org.bukkit.permissions.Permission;
 import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -146,7 +148,7 @@ public class MultiVoteListener extends JavaPlugin {
 
 		LocalDate today = LocalDate.now();
 		if (today.getDayOfMonth() == 1) {
-			voteCheck();
+			voteCheck(Bukkit.getConsoleSender());
 		}
 	}
 
@@ -229,7 +231,7 @@ public class MultiVoteListener extends JavaPlugin {
 
 	}
 
-	public void voteCheck() {
+	public void voteCheck(CommandSender sender) {
 		LocalDate today = LocalDate.now();
 		YearMonth previousMonthOfThisYear = YearMonth.from(today.minusMonths(1));
 		int monthValuePreviousMonth = previousMonthOfThisYear.getMonthValue();
@@ -266,6 +268,15 @@ public class MultiVoteListener extends JavaPlugin {
 		} catch (SQLException e) {
 			e.printStackTrace();
 		}
+
+		Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "lp sync");
+		String message = Tools.reformatColorCodes(this.getConfig().getString("message_prefix") + this.getConfig().getString("messages.given_trophies"));
+		Month monthAsEnum = Month.of(monthValuePreviousMonth);
+		String monthName = monthAsEnum.getDisplayName(TextStyle.FULL, Locale.GERMAN);
+		message = message.replaceAll("%month%", monthName);
+		message = message.replaceAll("%year%", yearValueOfPreviousMonth + "");
+
+		sender.sendMessage(message);
 	}
 
 	public void receiveTrophies(JavaPlugin plugin, UUID playerUUID){
@@ -296,6 +307,15 @@ public class MultiVoteListener extends JavaPlugin {
 				giveTrophy(plugin, playerUUID, month, year);
 			}
 		}
+
+		String message;
+		if(allTrophyPermissionsOfPlayer.isEmpty()){
+			message = Tools.reformatColorCodes(this.getConfig().getString("message_prefix") + this.getConfig().getString("messages.not_voted_enough"));
+		} else{
+			message = Tools.reformatColorCodes(this.getConfig().getString("message_prefix") + this.getConfig().getString("messages.thank_you_for_voting_regularly"));
+		}
+		Player player = Bukkit.getPlayer(playerUUID);
+		player.sendMessage(message);
 	}
 
 	private void giveTrophy(JavaPlugin plugin, UUID playerUUID, int month, int year){
@@ -309,9 +329,22 @@ public class MultiVoteListener extends JavaPlugin {
 		give_command = give_command.replaceAll("%player_name%", username);
 		give_command = give_command.replaceAll("%month%", monthName);
 		give_command = give_command.replaceAll("%year%", year + "");
+
+		removePermissionViaConsole(plugin, playerUUID.toString(),month, year);
+		Player player = Bukkit.getPlayer(playerUUID);
+
 		Bukkit.dispatchCommand(Bukkit.getConsoleSender(), give_command);
+		String message = Tools.reformatColorCodes(this.getConfig().getString("message_prefix") + this.getConfig().getString("messages.vote_trophy_reward_notice"));
+		message = message.replaceAll("%month%", monthName);
+		message = message.replaceAll("%year%", year + "");
+		player.sendMessage(message);
+
 		int money_reward = plugin.getConfig().getInt("monthly_vote_reward_money");
 		getEcoAPI().depositPlayer(user,money_reward);
+
+		String money_message = Tools.reformatColorCodes(this.getConfig().getString("message_prefix") + this.getConfig().getString("messages.player_money_reward"));
+		money_message = money_message.replaceAll("%amount%", this.getConfig().getString("monthly_vote_reward_money"));
+		player.sendMessage(money_message);
 	}
 
 	public void setPermissionViaConsole(JavaPlugin plugin, String playerUUIDString, int monthValue, int yearValue) {
@@ -319,6 +352,14 @@ public class MultiVoteListener extends JavaPlugin {
 		String permission = "blockminers.votepokal." + monthValue + "_" + yearValue;
 		String command = "lp user " + playerName + " permission set " + permission;
 		Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command);
+	}
+
+	public void removePermissionViaConsole(JavaPlugin plugin, String playerUUIDString, int monthValue, int yearValue) {
+		String playerName = getOfflinePlayer(UUID.fromString(playerUUIDString)).getName();
+		String permission = "blockminers.votepokal." + monthValue + "_" + yearValue;
+		String command = "lp user " + playerName + " permission unset " + permission;
+		Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command);
+		Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "lp sync");
 	}
 
 }

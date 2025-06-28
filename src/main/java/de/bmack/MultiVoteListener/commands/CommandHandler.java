@@ -76,11 +76,12 @@ public class CommandHandler implements CommandExecutor {
 							plugin.receiveTrophies(plugin, playerUUID);
 						}
 						else{
-							sender.sendMessage("Bitte Spielername angeben </mvote receive-trophies Spielername>");
+							String message = Tools.reformatColorCodes(plugin.getConfig().getString("message_prefix") + plugin.getConfig().getString("messages.usage_receive_trophies"));
+							sender.sendMessage(message);
 						}
 						break;
 					case "give-trophies":
-						plugin.voteCheck();
+						plugin.voteCheck(sender);
 						break;
 					default:
 						commandResponse(sender, Tools.getUsage());

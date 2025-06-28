@@ -36,6 +36,11 @@ messages:
   broadcast_vote_success: '&C%name% hat auf %service% gevotet.'
   no_vault_warning: 'Vault is not running. Money will not be credited to user.'
   no_playerpoints_warning: 'PlayerPoints is not running. Vote points will not be credited.'
+  vote_trophy_reward_notice: '&AGlückwunsch zum Pokal des Vote-Königs für %month% %year%!'
+  thank_you_for_voting_regularly: '&AVielen Dank fürs fleißige Voten!'
+  not_voted_enough: '&AAktuell hast du keinen Anspruch auf einen Vote-Pokal. Mit fleißigem Voten klappts nächsten Monat bestimmt!'
+  given_trophies: '&AEs wurden alle Permissions zur Abholung der Vote-Pokale für %month% %year% verteilt'
+  usage_receive_trophies: '&ABitte Spielername angeben. &C</mvote receive-trophies Spielername>'
 trophy_head_command: "minecraft:give %player_name% player_head[custom_name='{\"color\":\"gold\",\"italic\":false,\"text\":\"Pokal des Vote-Königs\"}',lore=['{\"color\":\"gray\",\"italic\":false,\"text\":\"%month% %year%\"}','{\"color\":\"gray\",\"italic\":false,\"text\":\"%player_name%\"}'],profile={id:[I;-270374757,-2102440140,-1778315967,-1516517793],properties:[{name:\"textures\",value:\"eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvZDY1ZjMyMWE4OWY2NDViM2I0ZmQyNWY1ZWNiOWI2NGY3YmQ2NDQ4NTAyNGRkNGQzYzI3MTEzYjhmNzQ5MDQ0YyJ9fX0=\"}]}] 1"
 monthly_vote_reward_money: 5000
 
