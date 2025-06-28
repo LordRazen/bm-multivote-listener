@@ -66,6 +66,14 @@ public class CommandHandler implements CommandExecutor {
 					case "services":
 						commandResponse(sender, Tools.getServices(plugin));
 						break;
+					case "receive-trophies":
+						if(args.length > 1){
+							plugin.receiveTrophies(plugin, args[1]);
+						}
+						else{
+							sender.sendMessage("Bitte Spielername angeben </mvote receive-trophies Spielername>");
+						}
+						break;
 					case "give-trophies":
 						plugin.voteCheck();
 						break;

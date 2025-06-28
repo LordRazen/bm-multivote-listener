@@ -5,8 +5,12 @@ import java.sql.*;
 import java.time.LocalDate;
 import java.time.Month;
 import java.time.YearMonth;
+import java.time.format.TextStyle;
+import java.util.ArrayList;
+import java.util.Locale;
 
 import de.bmack.MultiVoteListener.utils.Logger;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.permissions.Permission;
 import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -262,6 +266,50 @@ public class MultiVoteListener extends JavaPlugin {
 		} catch (SQLException e) {
 			e.printStackTrace();
 		}
+	}
+
+	public void receiveTrophies(JavaPlugin plugin, String username){
+		ArrayList<String> allTrophyPermissionsOfPlayer = new ArrayList<String>();
+
+		String sql = """
+            SELECT permission FROM luckperms_user_permissions WHERE permission = "blockminers.votepokal.*" AND username = ?;
+            """;
+
+		try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+			stmt.setString(1, "username");
+
+			try (ResultSet rs = stmt.executeQuery()) {
+				while (rs.next()) {
+					String permission = rs.getString("permission");
+					allTrophyPermissionsOfPlayer.add(permission);
+				}
+			}
+		} catch (SQLException e) {
+			e.printStackTrace();
+		}
+
+		if(!allTrophyPermissionsOfPlayer.isEmpty()){
+			for(String trophyPermission: allTrophyPermissionsOfPlayer){
+				String monthYearString = trophyPermission.split(".")[2];
+				int month = Integer.parseInt(monthYearString.split("_")[0]);
+				int year = Integer.parseInt(monthYearString.split("_")[1]);
+				giveTrophy(plugin, username, month, year);
+			}
+		}
+	}
+
+	private void giveTrophy(JavaPlugin plugin, String username, int month, int year){
+		Month monthAsEnum = Month.of(month);
+		String monthName = monthAsEnum.getDisplayName(TextStyle.FULL, Locale.GERMAN);
+
+		String give_command = Tools.reformatColorCodes(plugin.getConfig().getString("trophy_head_command"));
+		give_command = give_command.replaceAll("%player_name%", username);
+		give_command = give_command.replaceAll("%month%", monthName);
+		give_command = give_command.replaceAll("%year%", year + "");
+		Bukkit.dispatchCommand(Bukkit.getConsoleSender(), give_command);
+		OfflinePlayer user = Bukkit.getOfflinePlayer(username);
+		int money_reward = plugin.getConfig().getInt("monthly_vote_reward_money");
+		getEcoAPI().depositPlayer(user,money_reward);
 	}
 
 	public void setPermissionViaConsole(JavaPlugin plugin, String playerName, int monthValue, int yearValue) {
