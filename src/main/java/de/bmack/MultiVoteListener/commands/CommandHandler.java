@@ -68,6 +68,7 @@ public class CommandHandler implements CommandExecutor {
 						break;
 					case "give-trophies":
 						plugin.voteCheck();
+						break;
 					default:
 						commandResponse(sender, Tools.getUsage());
 						break;

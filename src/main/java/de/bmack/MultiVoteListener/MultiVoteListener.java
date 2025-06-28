@@ -268,7 +268,7 @@ public class MultiVoteListener extends JavaPlugin {
 		}
 	}
 	public void setPermissionViaConsole(JavaPlugin plugin, String playerName, int monthValue, int yearValue) {
-		String permission = plugin.getConfig().getString("permission." + monthValue + "_" + yearValue);
+		String permission = "blockminers.votepokal." + monthValue + "_" + yearValue;
 		String command = "lp user " + playerName + " permission set " + permission;
 		Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command);
 	}
