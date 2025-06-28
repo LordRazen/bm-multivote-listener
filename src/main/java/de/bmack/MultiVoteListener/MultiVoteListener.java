@@ -49,11 +49,6 @@ public class MultiVoteListener extends JavaPlugin {
 	 */
 	@Override
 	public void onEnable() {
-
-
-
-
-
 		config = getConfig();
 		String host = config.getString("database.host");
 		int port = config.getInt("database.port");
@@ -142,8 +137,10 @@ public class MultiVoteListener extends JavaPlugin {
 		this.newVote = new VoteEventListener(this);
 		this.getCommand("mvote").setExecutor(new CommandHandler(this));
 
-		voteCheck();
-
+		LocalDate today = LocalDate.now();
+		if (today.getDayOfMonth() == 1) {
+			voteCheck();
+		}
 	}
 
 	/**
@@ -224,7 +221,7 @@ public class MultiVoteListener extends JavaPlugin {
 		return isSpigot;
 
 	}
-	
+
 	public void voteCheck() {
 		LocalDate today = LocalDate.now();
 		YearMonth previousMonthOfThisYear = YearMonth.from(today.minusMonths(1));
