@@ -70,6 +70,8 @@ public class Tools {
     	usageList.add("  services - List available vote services");
     	usageList.add("  status   - Show active plugin hooks");
     	usageList.add("  help     - This information");
+		usageList.add("  give-trophies     - Manually activates monthly run giving permissions to get monthly vote rewards to all players who voted enough in the last month");
+		usageList.add("  receive-trophies player_name     - Command for giving the player alls his monthly vote rewards if he has the permissions (used by Bosshop)");
     	return usageList;
     }
     
