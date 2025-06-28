@@ -8,6 +8,7 @@ import java.time.YearMonth;
 import java.time.format.TextStyle;
 import java.util.ArrayList;
 import java.util.Locale;
+import java.util.UUID;
 
 import de.bmack.MultiVoteListener.utils.Logger;
 import org.bukkit.OfflinePlayer;
@@ -24,6 +25,8 @@ import org.black_ixx.playerpoints.PlayerPointsAPI;
 
 import de.bmack.MultiVoteListener.commands.CommandHandler;
 import de.bmack.MultiVoteListener.listeners.VoteEventListener;
+
+import static org.bukkit.Bukkit.getOfflinePlayer;
 
 /**
  * Main class of the MultiVotePlugin
@@ -235,17 +238,17 @@ public class MultiVoteListener extends JavaPlugin {
 
 		String sql = """
             SELECT
-            	username
+            	uuid
             FROM
             	votes
             WHERE
             	MONTH(date) = ? AND YEAR(date) = ? AND votesite = ?
             GROUP BY
-            	username
+            	uuid
             HAVING
             	COUNT(DISTINCT DATE(date)) >= ?
             ORDER BY
-            	username DESC;
+            	uuid DESC;
             """;
 
 		try (PreparedStatement stmt = connection.prepareStatement(sql)) {
@@ -256,11 +259,8 @@ public class MultiVoteListener extends JavaPlugin {
 
 			try (ResultSet rs = stmt.executeQuery()) {
 				while (rs.next()) {
-					String username = rs.getString("username");
-					System.out.println("bla");
-					System.out.println(username);
-					setPermissionViaConsole(this,username, monthValuePreviousMonth, yearValueOfPreviousMonth);
-
+					String uuidString = rs.getString("uuid");
+					setPermissionViaConsole(this,uuidString, monthValuePreviousMonth, yearValueOfPreviousMonth);
 				}
 			}
 		} catch (SQLException e) {
@@ -268,15 +268,15 @@ public class MultiVoteListener extends JavaPlugin {
 		}
 	}
 
-	public void receiveTrophies(JavaPlugin plugin, String username){
+	public void receiveTrophies(JavaPlugin plugin, UUID playerUUID){
 		ArrayList<String> allTrophyPermissionsOfPlayer = new ArrayList<String>();
 
 		String sql = """
-            SELECT permission FROM luckperms_user_permissions WHERE permission = "blockminers.votepokal.*" AND username = ?;
+            SELECT permission FROM luckperms_user_permissions WHERE permission LIKE "blockminers.votepokal.%" AND uuid = ?;
             """;
 
 		try (PreparedStatement stmt = connection.prepareStatement(sql)) {
-			stmt.setString(1, "username");
+			stmt.setString(1, playerUUID.toString());
 
 			try (ResultSet rs = stmt.executeQuery()) {
 				while (rs.next()) {
@@ -290,15 +290,18 @@ public class MultiVoteListener extends JavaPlugin {
 
 		if(!allTrophyPermissionsOfPlayer.isEmpty()){
 			for(String trophyPermission: allTrophyPermissionsOfPlayer){
-				String monthYearString = trophyPermission.split(".")[2];
+				String monthYearString = trophyPermission.split("\\.")[2];
 				int month = Integer.parseInt(monthYearString.split("_")[0]);
 				int year = Integer.parseInt(monthYearString.split("_")[1]);
-				giveTrophy(plugin, username, month, year);
+				giveTrophy(plugin, playerUUID, month, year);
 			}
 		}
 	}
 
-	private void giveTrophy(JavaPlugin plugin, String username, int month, int year){
+	private void giveTrophy(JavaPlugin plugin, UUID playerUUID, int month, int year){
+		OfflinePlayer user = getOfflinePlayer(playerUUID);
+		String username = user.getName();
+
 		Month monthAsEnum = Month.of(month);
 		String monthName = monthAsEnum.getDisplayName(TextStyle.FULL, Locale.GERMAN);
 
@@ -307,12 +310,12 @@ public class MultiVoteListener extends JavaPlugin {
 		give_command = give_command.replaceAll("%month%", monthName);
 		give_command = give_command.replaceAll("%year%", year + "");
 		Bukkit.dispatchCommand(Bukkit.getConsoleSender(), give_command);
-		OfflinePlayer user = Bukkit.getOfflinePlayer(username);
 		int money_reward = plugin.getConfig().getInt("monthly_vote_reward_money");
 		getEcoAPI().depositPlayer(user,money_reward);
 	}
 
-	public void setPermissionViaConsole(JavaPlugin plugin, String playerName, int monthValue, int yearValue) {
+	public void setPermissionViaConsole(JavaPlugin plugin, String playerUUIDString, int monthValue, int yearValue) {
+		String playerName = getOfflinePlayer(UUID.fromString(playerUUIDString)).getName();
 		String permission = "blockminers.votepokal." + monthValue + "_" + yearValue;
 		String command = "lp user " + playerName + " permission set " + permission;
 		Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command);

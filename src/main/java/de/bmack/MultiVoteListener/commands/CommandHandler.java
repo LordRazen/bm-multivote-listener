@@ -3,8 +3,10 @@ package de.bmack.MultiVoteListener.commands;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 
 import org.bukkit.Bukkit;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -12,6 +14,8 @@ import org.bukkit.entity.Player;
 
 import de.bmack.MultiVoteListener.MultiVoteListener;
 import de.bmack.MultiVoteListener.Tools;
+
+import static org.bukkit.Bukkit.getOfflinePlayer;
 
 /**
  * Implements a CommandExecutor
@@ -68,7 +72,8 @@ public class CommandHandler implements CommandExecutor {
 						break;
 					case "receive-trophies":
 						if(args.length > 1){
-							plugin.receiveTrophies(plugin, args[1]);
+							UUID playerUUID = Bukkit.getOfflinePlayer(args[1]).getUniqueId();
+							plugin.receiveTrophies(plugin, playerUUID);
 						}
 						else{
 							sender.sendMessage("Bitte Spielername angeben </mvote receive-trophies Spielername>");
