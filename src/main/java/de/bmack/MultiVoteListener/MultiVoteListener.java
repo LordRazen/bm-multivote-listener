@@ -224,7 +224,7 @@ public class MultiVoteListener extends JavaPlugin {
 		return isSpigot;
 
 	}
-	private void voteCheck() {
+	public void voteCheck() {
 		LocalDate today = LocalDate.now();
 
 		if (today.getDayOfMonth() == 1) {

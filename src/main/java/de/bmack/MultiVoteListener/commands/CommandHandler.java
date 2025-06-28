@@ -66,6 +66,8 @@ public class CommandHandler implements CommandExecutor {
 					case "services":
 						commandResponse(sender, Tools.getServices(plugin));
 						break;
+					case "give-trophies":
+						plugin.voteCheck();
 					default:
 						commandResponse(sender, Tools.getUsage());
 						break;
