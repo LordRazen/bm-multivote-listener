@@ -257,7 +257,7 @@ public class MultiVoteListener extends JavaPlugin {
 				try (ResultSet rs = stmt.executeQuery()) {
 					while (rs.next()) {
 						String username = rs.getString("username");
-						setPermissionViaConsole(this,username);
+						setPermissionViaConsole(this,username, monthValuePreviousMonth, yearValueOfPreviousMonth);
 
 					}
 				}
@@ -267,8 +267,8 @@ public class MultiVoteListener extends JavaPlugin {
 			}
 		}
 	}
-	public void setPermissionViaConsole(JavaPlugin plugin, String playerName) {
-		String permission = plugin.getConfig().getString("permission");
+	public void setPermissionViaConsole(JavaPlugin plugin, String playerName, int monthValue, int yearValue) {
+		String permission = plugin.getConfig().getString("permission." + monthValue + "_" + yearValue);
 		String command = "lp user " + playerName + " permission set " + permission;
 		Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command);
 	}
