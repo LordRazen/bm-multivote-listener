@@ -228,10 +228,10 @@ public class MultiVoteListener extends JavaPlugin {
 		LocalDate today = LocalDate.now();
 
 		if (today.getDayOfMonth() == 1) {
-			YearMonth vorherigerMonat = YearMonth.from(today.minusMonths(1));
-			int monat = vorherigerMonat.getMonthValue();
-			int jahr = vorherigerMonat.getYear();
-			int zuErreichendeTageMinimum = vorherigerMonat.lengthOfMonth() - 1;
+			YearMonth previousMonthOfThisYear = YearMonth.from(today.minusMonths(1));
+			int monthValuePreviousMonth = previousMonthOfThisYear.getMonthValue();
+			int yearValueOfPreviousMonth = previousMonthOfThisYear.getYear();
+			int minDaysNeeded = previousMonthOfThisYear.lengthOfMonth() - 1;
 
 			String sql = """
                 SELECT
@@ -249,9 +249,9 @@ public class MultiVoteListener extends JavaPlugin {
                 """;
 
 			try (PreparedStatement stmt = connection.prepareStatement(sql)) {
-				stmt.setInt(1, monat);
-				stmt.setInt(2, jahr); 
-				stmt.setInt(3, zuErreichendeTageMinimum);
+				stmt.setInt(1, monthValuePreviousMonth);
+				stmt.setInt(2, yearValueOfPreviousMonth);
+				stmt.setInt(3, minDaysNeeded);
 
 				try (ResultSet rs = stmt.executeQuery()) {
 					while (rs.next()) {
