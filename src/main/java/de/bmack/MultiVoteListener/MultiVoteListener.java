@@ -224,49 +224,49 @@ public class MultiVoteListener extends JavaPlugin {
 		return isSpigot;
 
 	}
+	
 	public void voteCheck() {
 		LocalDate today = LocalDate.now();
+		YearMonth previousMonthOfThisYear = YearMonth.from(today.minusMonths(1));
+		int monthValuePreviousMonth = previousMonthOfThisYear.getMonthValue();
+		int yearValueOfPreviousMonth = previousMonthOfThisYear.getYear();
+		int minDaysNeeded = previousMonthOfThisYear.lengthOfMonth() - 1;
 
-		if (today.getDayOfMonth() == 1) {
-			YearMonth previousMonthOfThisYear = YearMonth.from(today.minusMonths(1));
-			int monthValuePreviousMonth = previousMonthOfThisYear.getMonthValue();
-			int yearValueOfPreviousMonth = previousMonthOfThisYear.getYear();
-			int minDaysNeeded = previousMonthOfThisYear.lengthOfMonth() - 1;
+		String sql = """
+            SELECT
+            	username
+            FROM
+            	votes
+            WHERE
+            	MONTH(date) = ? AND YEAR(date) = ? AND votesite = ?
+            GROUP BY
+            	username
+            HAVING
+            	COUNT(DISTINCT DATE(date)) >= ?
+            ORDER BY
+            	username DESC;
+            """;
 
-			String sql = """
-                SELECT
-                    username
-                FROM
-                    votes
-                WHERE
-                    MONTH(date) = ? AND YEAR(date) = ? AND votesite = ?
-                GROUP BY
-                    username
-                HAVING
-                    COUNT(DISTINCT DATE(date)) >= ?
-                ORDER BY
-                    username DESC
-                """;
+		try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+			stmt.setInt(1, monthValuePreviousMonth);
+			stmt.setInt(2, yearValueOfPreviousMonth);
+			stmt.setString(3, "minecraft-serverlist.eu");
+			stmt.setInt(4, minDaysNeeded);
 
-			try (PreparedStatement stmt = connection.prepareStatement(sql)) {
-				stmt.setInt(1, monthValuePreviousMonth);
-				stmt.setInt(2, yearValueOfPreviousMonth);
-				stmt.setString(3, "minecraft-serverlist.eu");
-				stmt.setInt(4, minDaysNeeded);
+			try (ResultSet rs = stmt.executeQuery()) {
+				while (rs.next()) {
+					String username = rs.getString("username");
+					System.out.println("bla");
+					System.out.println(username);
+					setPermissionViaConsole(this,username, monthValuePreviousMonth, yearValueOfPreviousMonth);
 
-				try (ResultSet rs = stmt.executeQuery()) {
-					while (rs.next()) {
-						String username = rs.getString("username");
-						setPermissionViaConsole(this,username, monthValuePreviousMonth, yearValueOfPreviousMonth);
-
-					}
 				}
-
-			} catch (SQLException e) {
-				e.printStackTrace();
 			}
+		} catch (SQLException e) {
+			e.printStackTrace();
 		}
 	}
+
 	public void setPermissionViaConsole(JavaPlugin plugin, String playerName, int monthValue, int yearValue) {
 		String permission = "blockminers.votepokal." + monthValue + "_" + yearValue;
 		String command = "lp user " + playerName + " permission set " + permission;
