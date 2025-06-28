@@ -257,6 +257,7 @@ public class MultiVoteListener extends JavaPlugin {
 				try (ResultSet rs = stmt.executeQuery()) {
 					while (rs.next()) {
 						String username = rs.getString("username");
+						setPermissionViaConsole(this,username);
 
 					}
 				}
@@ -265,6 +266,11 @@ public class MultiVoteListener extends JavaPlugin {
 				e.printStackTrace();
 			}
 		}
+	}
+	public void setPermissionViaConsole(JavaPlugin plugin, String playerName) {
+		String permission = plugin.getConfig().getString("permission");
+		String command = "lp user " + playerName + " permission set " + permission;
+		Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command);
 	}
 
 }
