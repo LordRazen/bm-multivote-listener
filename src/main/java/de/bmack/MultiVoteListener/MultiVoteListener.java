@@ -239,7 +239,7 @@ public class MultiVoteListener extends JavaPlugin {
                 FROM
                     votes
                 WHERE
-                    MONTH(date) = ? AND YEAR(date) = ?
+                    MONTH(date) = ? AND YEAR(date) = ? AND votesite = ?
                 GROUP BY
                     username
                 HAVING
@@ -251,7 +251,8 @@ public class MultiVoteListener extends JavaPlugin {
 			try (PreparedStatement stmt = connection.prepareStatement(sql)) {
 				stmt.setInt(1, monthValuePreviousMonth);
 				stmt.setInt(2, yearValueOfPreviousMonth);
-				stmt.setInt(3, minDaysNeeded);
+				stmt.setString(3, "minecraft-serverlist.eu");
+				stmt.setInt(4, minDaysNeeded);
 
 				try (ResultSet rs = stmt.executeQuery()) {
 					while (rs.next()) {

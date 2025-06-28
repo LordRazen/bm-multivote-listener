@@ -13,3 +13,11 @@ commands:
    mvote:
      description: MultiVoteListener Command Interface
      usage: /mvote
+   votepokal:
+     description: Gibt einem Spieler einen Votepokal
+     usage: /votepokal
+     permission: blockminers.votepokal
+permissions:
+  blockminers.votepokal:
+    description: Erlaubt das Nutzen des Votepokal-Commands
+    default: false
