@@ -57,6 +57,8 @@ public class Tools {
     
     public static List<String> getStatus(MultiVoteListener plugin) {
     	List<String> stateList = new ArrayList<String>();
+		stateList.add("Status:");
+		stateList.add("---------------------------------------");
     	stateList.add(Tools.stateMessage("Spigot Server", plugin.isSpigot()));
     	stateList.add(Tools.stateMessage("Vault", plugin.isEnabledVaultEco()));
     	stateList.add(Tools.stateMessage("PlayerPoints", plugin.isEnabledPoints()));
@@ -66,12 +68,13 @@ public class Tools {
     public static List<String> getUsage() {
     	List<String> usageList = new ArrayList<String>();
     	usageList.add("MultiVoteListener Command options");
+		usageList.add("---------------------------------------");
     	usageList.add("reload   - Reload config file from disk");
     	usageList.add("services - List available vote services");
     	usageList.add("status   - Show active plugin hooks");
     	usageList.add("help     - This information");
-		usageList.add("---------------------------------------");
 		usageList.add("Vote-Trophy Commands:");
+		usageList.add("---------------------------------------");
 		usageList.add("give-trophies");
 		usageList.add("- Manually activates monthly run giving permissions to get monthly vote rewards to all players who voted enough in the last month");
 		usageList.add("receive-trophies player_name");
@@ -84,8 +87,8 @@ public class Tools {
     	String entry;
     	String next;
     	
-    	servicesList.add("&lConfigured Services       Status");
-    	servicesList.add("&l--------------------------------");
+    	servicesList.add("Configured Services       Status");
+    	servicesList.add("------------------------------------");
     	
 		Set<String> serviceNames = plugin.getConfig().getConfigurationSection("services").getKeys(false);
 		for ( Iterator<String> iterator = serviceNames.iterator(); iterator.hasNext(); ) {
