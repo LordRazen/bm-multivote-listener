@@ -73,7 +73,7 @@ public class CommandHandler implements CommandExecutor {
 					case "receive-trophies":
 						if(args.length > 1){
 							UUID playerUUID = Bukkit.getOfflinePlayer(args[1]).getUniqueId();
-							plugin.receiveTrophies(plugin, playerUUID);
+							plugin.receiveTrophies(plugin, playerUUID, sender);
 						}
 						else{
 							String message = Tools.reformatColorCodes(plugin.getConfig().getString("message_prefix") + plugin.getConfig().getString("messages.usage_receive_trophies"));
