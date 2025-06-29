@@ -12,6 +12,7 @@ import java.util.UUID;
 
 import de.bmack.MultiVoteListener.utils.Logger;
 import org.bukkit.OfflinePlayer;
+import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.permissions.Permission;
@@ -279,43 +280,49 @@ public class MultiVoteListener extends JavaPlugin {
 		sender.sendMessage(message);
 	}
 
-	public void receiveTrophies(JavaPlugin plugin, UUID playerUUID){
-		ArrayList<String> allTrophyPermissionsOfPlayer = new ArrayList<String>();
+	public void receiveTrophies(JavaPlugin plugin, UUID playerUUID, CommandSender commandSender) {
+		Player player = Bukkit.getPlayer(playerUUID);
+		if (player == null || !player.isOnline()) {
+			String message = Tools.reformatColorCodes(this.getConfig().getString("message_prefix") + this.getConfig().getString("messages.player_not_online"));
+			commandSender.sendMessage(message);
+		} else{
 
-		String sql = """
-            SELECT permission FROM luckperms_user_permissions WHERE permission LIKE "blockminers.votepokal.%" AND uuid = ?;
-            """;
+			ArrayList<String> allTrophyPermissionsOfPlayer = new ArrayList<String>();
 
-		try (PreparedStatement stmt = connection.prepareStatement(sql)) {
-			stmt.setString(1, playerUUID.toString());
+			String sql = """
+					SELECT permission FROM luckperms_user_permissions WHERE permission LIKE "blockminers.votepokal.%" AND uuid = ?;
+					""";
 
-			try (ResultSet rs = stmt.executeQuery()) {
-				while (rs.next()) {
-					String permission = rs.getString("permission");
-					allTrophyPermissionsOfPlayer.add(permission);
+			try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+				stmt.setString(1, playerUUID.toString());
+
+				try (ResultSet rs = stmt.executeQuery()) {
+					while (rs.next()) {
+						String permission = rs.getString("permission");
+						allTrophyPermissionsOfPlayer.add(permission);
+					}
+				}
+			} catch (SQLException e) {
+				e.printStackTrace();
+			}
+
+			if (!allTrophyPermissionsOfPlayer.isEmpty()) {
+				for (String trophyPermission : allTrophyPermissionsOfPlayer) {
+					String monthYearString = trophyPermission.split("\\.")[2];
+					int month = Integer.parseInt(monthYearString.split("_")[0]);
+					int year = Integer.parseInt(monthYearString.split("_")[1]);
+					giveTrophy(plugin, playerUUID, month, year);
 				}
 			}
-		} catch (SQLException e) {
-			e.printStackTrace();
-		}
 
-		if(!allTrophyPermissionsOfPlayer.isEmpty()){
-			for(String trophyPermission: allTrophyPermissionsOfPlayer){
-				String monthYearString = trophyPermission.split("\\.")[2];
-				int month = Integer.parseInt(monthYearString.split("_")[0]);
-				int year = Integer.parseInt(monthYearString.split("_")[1]);
-				giveTrophy(plugin, playerUUID, month, year);
+			String message;
+			if (allTrophyPermissionsOfPlayer.isEmpty()) {
+				message = Tools.reformatColorCodes(this.getConfig().getString("message_prefix") + this.getConfig().getString("messages.not_voted_enough"));
+			} else {
+				message = Tools.reformatColorCodes(this.getConfig().getString("message_prefix") + this.getConfig().getString("messages.thank_you_for_voting_regularly"));
 			}
+			player.sendMessage(message);
 		}
-
-		String message;
-		if(allTrophyPermissionsOfPlayer.isEmpty()){
-			message = Tools.reformatColorCodes(this.getConfig().getString("message_prefix") + this.getConfig().getString("messages.not_voted_enough"));
-		} else{
-			message = Tools.reformatColorCodes(this.getConfig().getString("message_prefix") + this.getConfig().getString("messages.thank_you_for_voting_regularly"));
-		}
-		Player player = Bukkit.getPlayer(playerUUID);
-		player.sendMessage(message);
 	}
 
 	private void giveTrophy(JavaPlugin plugin, UUID playerUUID, int month, int year){
