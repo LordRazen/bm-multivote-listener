@@ -84,8 +84,8 @@ public class Tools {
     	String entry;
     	String next;
     	
-    	servicesList.add("&lConfigured Services");
-    	servicesList.add("&l-------------------");
+    	servicesList.add("&lConfigured Services       Status");
+    	servicesList.add("&l--------------------------------");
     	
 		Set<String> serviceNames = plugin.getConfig().getConfigurationSection("services").getKeys(false);
 		for ( Iterator<String> iterator = serviceNames.iterator(); iterator.hasNext(); ) {
