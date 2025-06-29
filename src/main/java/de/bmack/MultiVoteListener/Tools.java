@@ -69,10 +69,10 @@ public class Tools {
     	List<String> usageList = new ArrayList<String>();
     	usageList.add("MultiVoteListener Command options");
 		usageList.add("---------------------------------------");
-    	usageList.add("reload    - Reload config file from disk");
+    	usageList.add("reload     - Reload config file from disk");
     	usageList.add("services  - List available vote services");
     	usageList.add("status     - Show active plugin hooks");
-    	usageList.add("help       - This information");
+    	usageList.add("help        - This information");
 		usageList.add("Vote-Trophy Commands:");
 		usageList.add("---------------------------------------");
 		usageList.add("give-trophies:");
@@ -96,7 +96,7 @@ public class Tools {
 		Set<String> serviceNames = plugin.getConfig().getConfigurationSection("services").getKeys(false);
 		for ( Iterator<String> iterator = serviceNames.iterator(); iterator.hasNext(); ) {
 			next = iterator.next();
-			entry = "(" + String.format("%1$-9s",next) + ") " + String.format("%1$-20s", plugin.getConfig().getString("services."+next+".name"));
+			entry = "(" + String.format("%1$-9s",next).replace(" ", "") + ") " + String.format("%1$-20s", plugin.getConfig().getString("services."+next+".name"));
 			if(plugin.getConfig().getBoolean("services."+next+".enabled")) {
 				entry += " &AActive";
 			}
