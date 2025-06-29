@@ -5,6 +5,9 @@
 # %name%
 # %service%
 # %amount%
+# %player_name%
+# %month%
+# %year%
 
 # If true any vote will trigger a broadcast regardless of being known to the server.
 # If false a broadcast will be executed if the player is known to the server.
@@ -31,7 +34,7 @@ database:
 messages:
   player_vote_success: '&CDanke für deinen Vote auf %service%.'
   player_money_reward: '&ADir wurden %amount% Coins gutgeschrieben.'
-  player_points_reward: '&ADu hast %amount% Votepoint(s) erhalten.'
+  player_points_reward: '&ADu hast einen Rangpunkt erhalten.'
   player_heal_reward: '&ADu wurdest geheilt.'
   broadcast_vote_success: '&C%name% hat auf %service% gevotet.'
   no_vault_warning: 'Vault is not running. Money will not be credited to user.'

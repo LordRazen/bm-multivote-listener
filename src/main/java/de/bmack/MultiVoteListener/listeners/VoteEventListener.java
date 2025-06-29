@@ -230,7 +230,6 @@ public class VoteEventListener implements Listener {
 				message = Tools.reformatColorCodes(plugin.getConfig().getString("message_prefix")+plugin.getConfig().getString("messages.player_points_reward"));
 				message = message.replaceAll("%name%", username);
 				message = message.replaceAll("%service%", service);
-				message = message.replaceAll("%amount%", ""+points_reward);
 				if(user.isOnline() && message.length() > 1 && !userMessage) {
 					Player.class.cast(user).sendMessage(message);	
 				}
