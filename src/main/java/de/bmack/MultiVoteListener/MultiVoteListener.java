@@ -257,7 +257,7 @@ public class MultiVoteListener extends JavaPlugin {
 		try (PreparedStatement stmt = connection.prepareStatement(sql)) {
 			stmt.setInt(1, monthValuePreviousMonth);
 			stmt.setInt(2, yearValueOfPreviousMonth);
-			stmt.setString(3, "minecraft-serverlist.eu");
+			stmt.setString(3, "minecraft-server.eu");
 			stmt.setInt(4, minDaysNeeded);
 
 			try (ResultSet rs = stmt.executeQuery()) {
