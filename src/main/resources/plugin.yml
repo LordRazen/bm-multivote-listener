@@ -3,7 +3,7 @@ author: bmack94
 version: ${project.version}
 main: de.bmack.MultiVoteListener.MultiVoteListener
 description: Multiple Service Vote Listener for Votifier
-api-version: 1.18
+api-version: 1.21.11
 
 authors: [ bmack94 ]
 depend: [ Votifier, Vault ]

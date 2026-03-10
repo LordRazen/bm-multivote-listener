@@ -1,13 +1,15 @@
 package de.bmack.MultiVoteListener.listeners;
 
-import java.lang.reflect.Method;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
-import java.sql.Statement;
+import java.sql.Date;
+import java.sql.Time;
+
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+
 
 import de.bmack.MultiVoteListener.MultiVoteListener;
 import de.bmack.MultiVoteListener.Tools;
@@ -94,7 +96,7 @@ public class VoteEventListener implements Listener {
 		}
 		
 		serviceNames = plugin.getConfig().getConfigurationSection("services").getKeys(false);
-		for ( Iterator<String> iterator = serviceNames.iterator(); iterator.hasNext(); ) {
+		for (Iterator<String> iterator = serviceNames.iterator(); iterator.hasNext(); ) {
 			  serviceId = iterator.next();
 			  if(plugin.getConfig().getString("services."+serviceId+".name").equals(service)) {
 				  knownService = true;
@@ -192,13 +194,22 @@ public class VoteEventListener implements Listener {
 			String voter = (username);
 			UUID voteruuid = user.getUniqueId();
 			String UUIDString = voteruuid.toString();
+			String timestamp = vote.getTimeStamp();
+
+		Date date = new Date(Long.parseLong(timestamp));
+		Time time = new Time(Long.parseLong(timestamp));
+
+
+
 
 			try (PreparedStatement stmt = connection.prepareStatement(
-					"INSERT INTO votes (uuid, username, votesite) VALUES (?, ?, ?)"
+					"INSERT INTO votes (uuid, username, votesite,date,time) VALUES (?, ?, ?, ?, ?)"
 			)) {
 				stmt.setString(1, UUIDString);
 				stmt.setString(2, voter);
 				stmt.setString(3, service);
+				stmt.setDate(4, date);
+				stmt.setTime(5, time);
 				stmt.executeUpdate();
 			} catch (SQLException exception) {
 				exception.printStackTrace();
