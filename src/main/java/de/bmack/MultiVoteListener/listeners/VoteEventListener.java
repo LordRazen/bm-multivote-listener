@@ -5,6 +5,9 @@ import java.sql.SQLException;
 import java.sql.Date;
 import java.sql.Time;
 
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
@@ -196,8 +199,10 @@ public class VoteEventListener implements Listener {
 			String UUIDString = voteruuid.toString();
 			String timestamp = vote.getTimeStamp();
 
-		Date date = new Date(Long.parseLong(timestamp));
-		Time time = new Time(Long.parseLong(timestamp));
+		long ts = Long.parseLong(timestamp);
+		Instant instant = Instant.ofEpochMilli(ts);
+		ZonedDateTime zdt = instant.atZone(ZoneId.of("Europe/Berlin"));
+
 
 
 
@@ -208,8 +213,8 @@ public class VoteEventListener implements Listener {
 				stmt.setString(1, UUIDString);
 				stmt.setString(2, voter);
 				stmt.setString(3, service);
-				stmt.setDate(4, date);
-				stmt.setTime(5, time);
+				stmt.setDate(4, Date.valueOf(zdt.toLocalDate()));
+				stmt.setTime(5, Time.valueOf(zdt.toLocalTime()));
 				stmt.executeUpdate();
 			} catch (SQLException exception) {
 				exception.printStackTrace();
