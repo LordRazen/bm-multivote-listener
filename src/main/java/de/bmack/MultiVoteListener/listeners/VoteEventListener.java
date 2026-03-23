@@ -18,6 +18,7 @@ import de.bmack.MultiVoteListener.MultiVoteListener;
 import de.bmack.MultiVoteListener.Tools;
 
 import de.bmack.MultiVoteListener.UrlBroadcast;
+import de.bmack.MultiVoteListener.utils.Logger;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
@@ -200,25 +201,24 @@ public class VoteEventListener implements Listener {
 			String timestamp = vote.getTimeStamp();
 
 		long ts = Long.parseLong(timestamp);
+		if (timestamp.length() < 13) {
+			ts = ts * 1000;
+		}
 		Instant instant = Instant.ofEpochMilli(ts);
 		ZonedDateTime zdt = instant.atZone(ZoneId.of("Europe/Berlin"));
-
-
-
-
-
 			try (PreparedStatement stmt = connection.prepareStatement(
 					"INSERT INTO votes (uuid, username, votesite,date,time) VALUES (?, ?, ?, ?, ?)"
 			)) {
 				stmt.setString(1, UUIDString);
 				stmt.setString(2, voter);
 				stmt.setString(3, service);
-				stmt.setDate(4, Date.valueOf(zdt.toLocalDate()));
-				stmt.setTime(5, Time.valueOf(zdt.toLocalTime()));
+				stmt.setObject(4, zdt.toLocalDate());
+				stmt.setObject(5, zdt.toLocalTime());
 				stmt.executeUpdate();
 			} catch (SQLException exception) {
 				exception.printStackTrace();
 			}
+			//System.out.println("Timestamp: " + timestamp + " | Date: " + zdt.toLocalDate() + " | Time: " + zdt.toLocalTime());
 			
 			// vault action
 			if(plugin.isEnabledVaultEco()) {
