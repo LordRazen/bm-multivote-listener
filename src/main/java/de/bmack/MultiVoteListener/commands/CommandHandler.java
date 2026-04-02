@@ -6,7 +6,6 @@ import java.util.Objects;
 import java.util.UUID;
 
 import org.bukkit.Bukkit;
-import org.bukkit.OfflinePlayer;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -14,6 +13,7 @@ import org.bukkit.entity.Player;
 
 import de.bmack.MultiVoteListener.MultiVoteListener;
 import de.bmack.MultiVoteListener.Tools;
+import org.jspecify.annotations.NonNull;
 
 import static org.bukkit.Bukkit.getOfflinePlayer;
 
@@ -35,13 +35,13 @@ public class CommandHandler implements CommandExecutor {
      * 
      * The entire command handling is done here.
      * 
-     * @param		sender
-     * @param		cmd
-     * @param		commandLabel
-     * @param		args
+     * @param		sender The CommandSender who issued the command. This can be a Player or the Console.
+     * @param		cmd The Command object representing the command that was issued. This contains information about the command, such as its name and arguments.
+     * @param		commandLabel The exact command string that was used to trigger this command. This may differ from the command's registered name if an alias was used.
+     * @param		args An array of strings representing the arguments passed to the command. For example, if the command was "/mvote reload", then args would be an array containing a single element: ["reload"].
      * @return		true
      */ 
-	public boolean onCommand(CommandSender sender, Command cmd, String commandLabel, String[] args) {
+	public boolean onCommand(@NonNull CommandSender sender, @NonNull Command cmd, @NonNull String commandLabel, String @NonNull [] args) {
         // Do nothing if sender is not OP or has appropriate permission
 		if(plugin.isEnabledVaultPerm()) {
 			if (!(sender.isOp() || Objects.requireNonNull(Bukkit.getPlayer(String.valueOf(sender))).hasPermission("mvote.admin"))) return true;
@@ -52,7 +52,7 @@ public class CommandHandler implements CommandExecutor {
 		
 		
 		// Handle /mvote command
-        if (cmd.getName().toLowerCase().equals("mvote")) {
+        if (cmd.getName().equalsIgnoreCase("mvote")) {
             if (args.length > 0) {
 				switch (args[0]) {
 					case "reload":

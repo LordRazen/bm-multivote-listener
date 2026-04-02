@@ -8,14 +8,13 @@ import java.time.YearMonth;
 import java.time.format.TextStyle;
 import java.util.ArrayList;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.UUID;
 
 import de.bmack.MultiVoteListener.utils.Logger;
 import org.bukkit.OfflinePlayer;
-import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
-import org.bukkit.permissions.Permission;
 import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.Bukkit;
@@ -146,7 +145,7 @@ public class MultiVoteListener extends JavaPlugin {
 		}
 
 		this.newVote = new VoteEventListener(this);
-		this.getCommand("mvote").setExecutor(new CommandHandler(this));
+		Objects.requireNonNull(this.getCommand("mvote")).setExecutor(new CommandHandler(this));
 
 		LocalDate today = LocalDate.now();
 		if (today.getDayOfMonth() == 1) {
@@ -334,7 +333,8 @@ public class MultiVoteListener extends JavaPlugin {
 		String monthName = monthAsEnum.getDisplayName(TextStyle.FULL, Locale.GERMAN);
 
 		String give_command = Tools.reformatColorCodes(plugin.getConfig().getString("trophy_head_command"));
-		give_command = give_command.replaceAll("%player_name%", username);
+        assert username != null;
+        give_command = give_command.replaceAll("%player_name%", username);
 		give_command = give_command.replaceAll("%month%", monthName);
 		give_command = give_command.replaceAll("%year%", year + "");
 
@@ -345,13 +345,14 @@ public class MultiVoteListener extends JavaPlugin {
 		String message = Tools.reformatColorCodes(this.getConfig().getString("message_prefix") + this.getConfig().getString("messages.vote_trophy_reward_notice"));
 		message = message.replaceAll("%month%", monthName);
 		message = message.replaceAll("%year%", year + "");
-		player.sendMessage(message);
+        assert player != null;
+        player.sendMessage(message);
 
 		int money_reward = plugin.getConfig().getInt("monthly_vote_reward_money");
 		getEcoAPI().depositPlayer(user,money_reward);
 
 		String money_message = Tools.reformatColorCodes(this.getConfig().getString("message_prefix") + this.getConfig().getString("messages.player_money_reward"));
-		money_message = money_message.replaceAll("%amount%", this.getConfig().getString("monthly_vote_reward_money"));
+		money_message = money_message.replaceAll("%amount%", Objects.requireNonNull(this.getConfig().getString("monthly_vote_reward_money")));
 		player.sendMessage(money_message);
 	}
 

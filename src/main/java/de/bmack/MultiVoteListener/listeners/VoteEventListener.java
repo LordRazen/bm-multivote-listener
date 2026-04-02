@@ -200,13 +200,6 @@ public class VoteEventListener implements Listener {
 			String UUIDString = voteruuid.toString();
 			String timestamp = vote.getTimeStamp();
 
-		long ts = Long.parseLong(timestamp);
-		if (timestamp.length() == 10) {
-			ts = ts*1000;
-		}
-		Instant instant = Instant.ofEpochMilli(ts);
-		ZonedDateTime zdt = instant.atZone(ZoneId.of("Europe/Berlin"));
-
 		/*
 		* tatsächliche zeit: 16:26
 			minecraft-server.eu: 1775146907 = 16:26 in GMT, 18:26 in GMT+2 => in der DB: 18:26
@@ -214,10 +207,21 @@ public class VoteEventListener implements Listener {
 
 			minecraft-serverlist.net: 1775139778 = 14:26 in GMT, 16:26 in GMT+2 => in der DB: 16:26
 			=> Da hier der GMT+2 Wert korrekt ist ist der Server wohl GMT+2*/
-		if (vote.getServiceName().equals("minecraft-server.eu")) {
+		long ts = Long.parseLong(timestamp);
+		if (timestamp.length() == 10) {
+			ts = ts*1000;
+		}
+		Instant instant = Instant.ofEpochMilli(ts);
+		ZonedDateTime zdt;
+		String serviceName = vote.getServiceName();
+		switch(serviceName){
 
-			zdt = instant.atZone(ZoneId.of("Europe/London"));
-
+		case "minecraft-server.eu" ->{
+			zdt = instant.atZone(ZoneId.of("GMT"));
+		}
+		default -> {
+			zdt = instant.atZone(ZoneId.of("Europe/Berlin"));
+		}
 		}
 
 
