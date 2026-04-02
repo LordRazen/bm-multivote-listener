@@ -67,10 +67,11 @@ public class MultiVoteListener extends JavaPlugin {
 		String password = config.getString("database.password");
 		try {
 			connection = DriverManager.getConnection(
-					"jdbc:mysql://" + host + ":" + port + "/" + dbName + "?useSSL=false&autoReconnect=true",
+					"jdbc:mysql://" + host + ":" + port + "/" + dbName + "?useSSL=false&autoReconnect=true&serverTimezone=UTC",
 					user,
 					password
 			);
+
 			Logger.info("[MultiVoteListener] Connection to Database established!");
 
 			// Create the mails table if it doesn't exist

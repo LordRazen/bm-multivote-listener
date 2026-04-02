@@ -22,7 +22,7 @@ public class UrlBroadcast {
 	public static void doBroadcast(MultiVoteListener plugin, String message, String url) {
 		TextComponent bcMessage = new TextComponent(message);
 		bcMessage.setClickEvent(new ClickEvent(ClickEvent.Action.OPEN_URL,url));
-		plugin.getServer().spigot().broadcast(bcMessage);
+		plugin.getServer().broadcast(bcMessage);
 	}
 	
 }
