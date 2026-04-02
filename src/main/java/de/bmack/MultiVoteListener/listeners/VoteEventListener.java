@@ -204,8 +204,9 @@ public class VoteEventListener implements Listener {
 		if (timestamp.length() == 10) {
 			ts = ts*1000;
 		}
-		Date date = new Date(ts);
-		Time time = new Time(ts);
+		Instant instant = Instant.ofEpochMilli(ts);
+		ZonedDateTime zdt = instant.atZone(ZoneId.of("Europe/Berlin"));
+
 		/*
 		* tatsächliche zeit: 16:26
 			minecraft-server.eu: 1775146907 = 16:26 in GMT, 18:26 in GMT+2 => in der DB: 18:26
@@ -214,9 +215,8 @@ public class VoteEventListener implements Listener {
 			minecraft-serverlist.net: 1775139778 = 14:26 in GMT, 16:26 in GMT+2 => in der DB: 16:26
 			=> Da hier der GMT+2 Wert korrekt ist ist der Server wohl GMT+2*/
 		if (vote.getServiceName().equals("minecraft-server.eu")) {
-			//Temporäre Lösung, SommerzeitProof?
-			date = new Date(ts-7200000);
-			time = new Time(ts-7200000);
+
+			zdt = instant.atZone(ZoneId.of("Europe/London"));
 
 		}
 
@@ -227,8 +227,8 @@ public class VoteEventListener implements Listener {
 				stmt.setString(1, UUIDString);
 				stmt.setString(2, voter);
 				stmt.setString(3, service);
-				stmt.setDate(4, date);
-				stmt.setTime(5, time);
+				stmt.setObject(4, zdt.toLocalDate());
+				stmt.setObject(5, zdt.toLocalTime());
 				stmt.executeUpdate();
 			} catch (SQLException exception) {
 				exception.printStackTrace();
