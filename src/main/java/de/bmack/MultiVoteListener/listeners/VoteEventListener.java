@@ -1,17 +1,12 @@
 package de.bmack.MultiVoteListener.listeners;
 
-import java.sql.PreparedStatement;
-import java.sql.SQLException;
-import java.sql.Date;
-import java.sql.Time;
+import java.sql.*;
 
+import java.sql.Date;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 
 
 import de.bmack.MultiVoteListener.MultiVoteListener;
@@ -42,7 +37,7 @@ import static de.bmack.MultiVoteListener.MultiVoteListener.connection;
  */ 
 public class VoteEventListener implements Listener {
 
-	private MultiVoteListener plugin; 
+	private MultiVoteListener plugin;
 	
 	/**
      * Constructor.
@@ -152,6 +147,73 @@ public class VoteEventListener implements Listener {
 		if(plugin.getConfig().isSet("services."+serviceId+".usermessage") ) {
 			userMessage = true;
 		}
+
+		//Logging to Database
+		String voter = (username);
+		UUID voteruuid = user.getUniqueId();
+		String UUIDString = voteruuid.toString();
+		String timestamp = vote.getTimeStamp();
+
+		/*
+		* tatsächliche Zeit: 16:26
+			minecraft-server.eu: 1775146907 = 16:26 in GMT, 18:26 in GMT+2 => in der DB: 18:26
+			=> Geht man davon aus, dass der Server die "richtige" Zeit verwendet müsste der Server also GMT timestamps senden
+
+			minecraft-serverlist.net: 1775139778 = 14:26 in GMT, 16:26 in GMT+2 => in der DB: 16:26
+			=> Da hier der GMT+2 Wert korrekt ist, ist der Server wohl GMT+2*/
+		long ts = Long.parseLong(timestamp);
+		if (timestamp.length() == 10) {
+			ts = ts*1000;
+		}
+		Instant instant = Instant.ofEpochMilli(ts);
+		ZonedDateTime zdt;
+		String serviceName = vote.getServiceName();
+		switch(serviceName){
+
+			case "minecraft-server.eu" ->{
+				zdt = instant.atZone(ZoneId.of("GMT"));
+			}
+			default -> {
+				zdt = instant.atZone(ZoneId.of("Europe/Berlin"));
+			}
+		}
+		boolean alreadyVoted;
+		try (PreparedStatement checkstmt = connection.prepareStatement(
+				"SELECT 1 FROM votes WHERE uuid = ? AND votesite = ? AND date = ?"
+		)) {
+			checkstmt.setString(1, UUIDString);
+			checkstmt.setString(2, service);
+			checkstmt.setObject(3, zdt.toLocalDate());
+			try (ResultSet rs = checkstmt.executeQuery()) {
+				alreadyVoted = rs.next();
+			}
+			if (!alreadyVoted){
+				try (PreparedStatement stmt = connection.prepareStatement(
+						"INSERT INTO votes (uuid, username, votesite,date,time) VALUES (?, ?, ?, ?, ?)"
+				)) {
+					stmt.setString(1, UUIDString);
+					stmt.setString(2, voter);
+					stmt.setString(3, service);
+					stmt.setObject(4, zdt.toLocalDate());
+					stmt.setObject(5, zdt.toLocalTime());
+					stmt.executeUpdate();
+				} catch (SQLException exception) {
+					exception.printStackTrace();
+				}
+			} else {
+				System.out.println(Tools.stripColorCodes(plugin.getConfig().getString("message_prefix")) + "User "+username+" has already voted on "+service+" at "+zdt.toLocalDate()+" "+zdt.toLocalTime());
+				return;
+			}
+		} catch (SQLException exception) {
+			exception.printStackTrace();
+			Logger.info("Database error while checking/inserting vote from user "+username+" on service "+service+" at "+zdt.toLocalDate()+" "+zdt.toLocalTime());
+		}
+
+
+
+
+
+
 		
 		// Compose a broadcast-message
 		broadcast = Tools.reformatColorCodes(plugin.getConfig().getString("message_prefix")+plugin.getConfig().getString("messages.broadcast_vote_success"));
@@ -194,49 +256,11 @@ public class VoteEventListener implements Listener {
 			}			
 			message = "";
 
-			//Logging to Database
-			String voter = (username);
-			UUID voteruuid = user.getUniqueId();
-			String UUIDString = voteruuid.toString();
-			String timestamp = vote.getTimeStamp();
-
-		/*
-		* tatsächliche zeit: 16:26
-			minecraft-server.eu: 1775146907 = 16:26 in GMT, 18:26 in GMT+2 => in der DB: 18:26
-			=> Geht man davon aus dass der Server die "richtige" Zeit verwendet müsste der Server also GMT timestamps senden
-
-			minecraft-serverlist.net: 1775139778 = 14:26 in GMT, 16:26 in GMT+2 => in der DB: 16:26
-			=> Da hier der GMT+2 Wert korrekt ist ist der Server wohl GMT+2*/
-		long ts = Long.parseLong(timestamp);
-		if (timestamp.length() == 10) {
-			ts = ts*1000;
-		}
-		Instant instant = Instant.ofEpochMilli(ts);
-		ZonedDateTime zdt;
-		String serviceName = vote.getServiceName();
-		switch(serviceName){
-
-		case "minecraft-server.eu" ->{
-			zdt = instant.atZone(ZoneId.of("GMT"));
-		}
-		default -> {
-			zdt = instant.atZone(ZoneId.of("Europe/Berlin"));
-		}
-		}
 
 
-			try (PreparedStatement stmt = connection.prepareStatement(
-					"INSERT INTO votes (uuid, username, votesite,date,time) VALUES (?, ?, ?, ?, ?)"
-			)) {
-				stmt.setString(1, UUIDString);
-				stmt.setString(2, voter);
-				stmt.setString(3, service);
-				stmt.setObject(4, zdt.toLocalDate());
-				stmt.setObject(5, zdt.toLocalTime());
-				stmt.executeUpdate();
-			} catch (SQLException exception) {
-				exception.printStackTrace();
-			}
+
+
+
 			//System.out.println("Timestamp: " + timestamp + " | Date: " + zdt.toLocalDate() + " | Time: " + zdt.toLocalTime());
 			
 			// vault action
