@@ -187,6 +187,11 @@ public class VoteEventListener implements Listener {
 			try (ResultSet rs = checkstmt.executeQuery()) {
 				alreadyVoted = rs.next();
 			}
+			catch (SQLException exception) {
+				exception.printStackTrace();
+				Logger.info("Database error while checking vote from user "+username+" on service "+service+" at "+zdt.toLocalDate()+" "+zdt.toLocalTime());
+				return;
+			}
 			if (!alreadyVoted){
 				try (PreparedStatement stmt = connection.prepareStatement(
 						"INSERT INTO votes (uuid, username, votesite,date,time) VALUES (?, ?, ?, ?, ?)"
@@ -197,8 +202,10 @@ public class VoteEventListener implements Listener {
 					stmt.setObject(4, zdt.toLocalDate());
 					stmt.setObject(5, zdt.toLocalTime());
 					stmt.executeUpdate();
-				} catch (SQLException exception) {
+				}
+				catch (SQLException exception) {
 					exception.printStackTrace();
+					Logger.info("Database error while inserting vote from user "+username+" on service "+service+" at "+zdt.toLocalDate()+" "+zdt.toLocalTime());
 				}
 			} else {
 				System.out.println(Tools.stripColorCodes(plugin.getConfig().getString("message_prefix")) + "User "+username+" has already voted on "+service+" at "+zdt.toLocalDate()+" "+zdt.toLocalTime());

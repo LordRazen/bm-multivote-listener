@@ -1,0 +1,15 @@
+name: MultiVoteListener
+author: bmack94
+version: 1.0
+main: de.bmack.MultiVoteListener.MultiVoteListener
+description: Multiple Service Vote Listener for Votifier
+api-version: 1.21.11
+
+authors: [ bmack94 ]
+depend: [ Votifier, Vault ]
+softdepend: [ PlayerPoints ]
+
+commands:
+   mvote:
+     description: MultiVoteListener Command Interface
+     usage: /mvote

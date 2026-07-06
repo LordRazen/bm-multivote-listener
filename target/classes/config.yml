@@ -1,0 +1,99 @@
+# MultiVoteListener configuration file
+# 
+# Placeholder (will be replaced in messages & commands
+# ----------------------------------------------------
+# %name%
+# %service%
+# %amount%
+# %player_name%
+# %month%
+# %year%
+
+# If true any vote will trigger a broadcast regardless of being known to the server.
+# If false a broadcast will be executed if the player is known to the server.
+allow_fake_names: true
+
+# Self-explanatory, isn't it? ^^
+message_prefix: '&6[&4MultiVoteListener&6] '
+
+# Database config
+database:
+  host: "127.0.0.1"
+  port: 3306
+  name: "blockminers_server"
+  user: "root"
+  password: "test"
+
+#
+# player_vote_success    - Message sent to the player that voted for the server
+# player_money_reward    - Message sent to the player when money has been credited to his account
+# player_points_reward   - Message sent to the player when player points have been credited to his account
+# broadcast_vote_success - Broadcast message on vote
+# no_[...]_warning		 - Log messages. Not visible for player. They go into Console/log
+#
+messages:
+  player_vote_success: '&CDanke für deinen Vote auf %service%.'
+  player_money_reward: '&ADir wurden %amount% Coins gutgeschrieben.'
+  player_points_reward: '&ADu hast einen Rangpunkt erhalten.'
+  player_heal_reward: '&ADu wurdest geheilt.'
+  broadcast_vote_success: '&C%name% hat auf %service% gevotet.'
+  no_vault_warning: 'Vault is not running. Money will not be credited to user.'
+  no_playerpoints_warning: 'PlayerPoints is not running. Vote points will not be credited.'
+  vote_trophy_reward_notice: '&AGlückwunsch zum Pokal des Vote-Königs für %month% %year%!'
+  thank_you_for_voting_regularly: '&AVielen Dank fürs fleißige Voten!'
+  not_voted_enough: '&AAktuell hast du keinen Anspruch auf einen Vote-Pokal. Mit fleißigem Voten klappts nächsten Monat bestimmt!'
+  given_trophies: '&AEs wurden alle Permissions zur Abholung der Vote-Pokale für %month% %year% verteilt'
+  usage_receive_trophies: '&ABitte Spielername angeben. &C</mvote receive-trophies Spielername>'
+  player_not_online: '&ADie Vote-Pokale konnten nicht abgeholt werden, da der Spieler nicht online ist.'
+trophy_head_command: 'minecraft:give %player_name% minecraft:player_head[custom_name={"color":"gold","italic":false,"text":"Pokal des Vote-Königs"},lore=[{"color":"gray","italic":false,"text":"%month% %year%"},{"color":"gray","italic":false,"text":"%player_name%"}],profile={id:[I;-270374757,-2102440140,-1778315967,-1516517793],properties:[{name:"textures",value:"eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvZDY1ZjMyMWE4OWY2NDViM2I0ZmQyNWY1ZWNiOWI2NGY3YmQ2NDQ4NTAyNGRkNGQzYzI3MTEzYjhmNzQ5MDQ0YyJ9fX0="}]}] 1'
+monthly_vote_reward_money: 5000
+
+#
+# Within commands placeholders will be handled similar to those in messages.
+# You may define serveral services beneath the "services:" node as shown below.
+# Do not remove "default" service. If you choose not to use it set "enabled: false".
+#
+# services:
+#   default:
+#     [...]
+#   service0:
+#     name: 'some name'	  --> used to identify vote service & as a replacement for %service% in messages+commands
+#     url: 'url'			    --> If a valid URL is provided, the broadcast message will be clickable
+#     usermessage:        -->'Some Text' --> If usermessage is set for service, player_*_reward messages will be suppressed
+#     enabled: true			  --> Enable/disable the service
+#     money: 100			    --> amount of money (requires Vault)
+#     points: 1				    --> amount of points (requires PlayerPoints)
+#     heal:	[true/false]	--> Heals/feeds the player if online
+#     online_commands:		--> Executed, if player is online
+#       - [cmd1]
+#     offline_commands:		--> Executed whether player is online or not
+#       - [cmd2]
+#   service1:
+#     [...]
+#   default:				      --> If defined and enable_default is true this is used if no matching service was found
+#     [...]
+#
+# Config can be updated after changing it by issuing the "/mvote reload" command.
+# If there are errors in the config the plugin will stop processing votes and issue a console error message
+  
+services:
+  default:
+    name: 'multivote_default'
+    url: 'http://bmack.de'
+    enabled: true
+    money: 150
+    points: 1
+    heal: true
+    online_commands: []
+    offline_commands: []
+#  service0:
+#    name: 'minecraft-server.eu'
+#    url: 'https://minecraft-server.eu/vote/index/74643'
+#    enabled: true
+#    money: 1
+#    points: 1
+#    heal: true
+#    online_commands:
+#      - 'bc mincraft-server.eu vote'
+#      - 'bc zweiter command'
+#    offline_commands: []

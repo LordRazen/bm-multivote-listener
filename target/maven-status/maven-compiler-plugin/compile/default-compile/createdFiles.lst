@@ -1,0 +1,6 @@
+de\bmack\MultiVoteListener\commands\CommandHandler.class
+de\bmack\MultiVoteListener\UrlBroadcast.class
+de\bmack\MultiVoteListener\Tools.class
+de\bmack\MultiVoteListener\listeners\VoteEventListener.class
+de\bmack\MultiVoteListener\utils\Logger.class
+de\bmack\MultiVoteListener\MultiVoteListener.class
