@@ -22,13 +22,40 @@ The current version of MultiVoteListener comes with the following features:
 *Requires:* 	 Votifier, Vault  
 *Can hook into:* PlayerPoints
 
+Build with Maven:
 
-**todo** build instructions
+```bash
+mvn clean package
+```
+
+The packaged plugin jar will include the required database libraries for HikariCP and MySQL.
 
 
 ## Configuration
 
-**todo** add link
+The plugin uses a HikariCP connection pool. Configure the database section in `config.yml`:
+
+```yml
+database:
+  jdbcUrl: "jdbc:mysql://127.0.0.1:3306/blockminers_server?useSSL=false&serverTimezone=UTC&tcpKeepAlive=true&connectTimeout=5000&socketTimeout=10000"
+  username: "root"
+  password: "test"
+  hikari:
+	poolName: "MultiVoteListenerPool"
+	maximumPoolSize: 10
+	minimumIdle: 2
+	connectionTimeout: 5000
+	idleTimeout: 600000
+	maxLifetime: 1800000
+	keepaliveTime: 300000
+	validationTimeout: 3000
+	initializationFailTimeout: 1
+	leakDetectionThreshold: 0
+	autoCommit: true
+	connectionTestQuery: "SELECT 1"
+```
+
+If the pool cannot be initialized during plugin startup, the plugin disables itself and writes an error to the console.
 
 ## Support & Troubleshooting
 Need help? Have a feature request?

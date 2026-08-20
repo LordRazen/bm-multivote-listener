@@ -26,8 +26,6 @@ import com.vexsoftware.votifier.model.Vote;
 import com.earth2me.essentials.User;
 import com.earth2me.essentials.Essentials;
 
-import static de.bmack.MultiVoteListener.MultiVoteListener.connection;
-
 /**
  * Listener implementation for Vote Events.
  * 
@@ -177,43 +175,16 @@ public class VoteEventListener implements Listener {
 				zdt = instant.atZone(ZoneId.of("Europe/Berlin"));
 			}
 		}
-		boolean alreadyVoted;
-		try (PreparedStatement checkstmt = connection.prepareStatement(
-				"SELECT 1 FROM votes WHERE uuid = ? AND votesite = ? AND date = ?"
-		)) {
-			checkstmt.setString(1, UUIDString);
-			checkstmt.setString(2, service);
-			checkstmt.setObject(3, zdt.toLocalDate());
-			try (ResultSet rs = checkstmt.executeQuery()) {
-				alreadyVoted = rs.next();
-			}
-			catch (SQLException exception) {
-				exception.printStackTrace();
-				Logger.info("Database error while checking vote from user "+username+" on service "+service+" at "+zdt.toLocalDate()+" "+zdt.toLocalTime());
-				return;
-			}
-			if (!alreadyVoted){
-				try (PreparedStatement stmt = connection.prepareStatement(
-						"INSERT INTO votes (uuid, username, votesite,date,time) VALUES (?, ?, ?, ?, ?)"
-				)) {
-					stmt.setString(1, UUIDString);
-					stmt.setString(2, voter);
-					stmt.setString(3, service);
-					stmt.setObject(4, zdt.toLocalDate());
-					stmt.setObject(5, zdt.toLocalTime());
-					stmt.executeUpdate();
-				}
-				catch (SQLException exception) {
-					exception.printStackTrace();
-					Logger.info("Database error while inserting vote from user "+username+" on service "+service+" at "+zdt.toLocalDate()+" "+zdt.toLocalTime());
-				}
-			} else {
-				System.out.println(Tools.stripColorCodes(plugin.getConfig().getString("message_prefix")) + "User "+username+" has already voted on "+service+" at "+zdt.toLocalDate()+" "+zdt.toLocalTime());
+		try {
+			boolean inserted = saveVoteIfNotExists(UUIDString, voter, service, zdt.toLocalDate(), zdt.toLocalTime());
+			if (!inserted) {
+				System.out.println(Tools.stripColorCodes(plugin.getConfig().getString("message_prefix")) + "User " + username + " has already voted on " + service + " at " + zdt.toLocalDate() + " " + zdt.toLocalTime());
 				return;
 			}
 		} catch (SQLException exception) {
 			exception.printStackTrace();
 			Logger.info("Database error while checking/inserting vote from user "+username+" on service "+service+" at "+zdt.toLocalDate()+" "+zdt.toLocalTime());
+			return;
 		}
 
 
@@ -343,6 +314,35 @@ public class VoteEventListener implements Listener {
 			}
 		//}
 		return;
+	}
+
+	private boolean saveVoteIfNotExists(String uuid, String username, String service, java.time.LocalDate date, java.time.LocalTime time) throws SQLException {
+		Boolean alreadyVoted = plugin.getDatabaseManager().executeQuery(
+				"SELECT 1 FROM votes WHERE uuid = ? AND votesite = ? AND date = ?",
+				stmt -> {
+					stmt.setString(1, uuid);
+					stmt.setString(2, service);
+					stmt.setObject(3, date);
+				},
+				rs -> rs.next()
+		);
+
+		if (Boolean.TRUE.equals(alreadyVoted)) {
+			return false;
+		}
+
+		plugin.getDatabaseManager().executeUpdate(
+				"INSERT INTO votes (uuid, username, votesite, date, time) VALUES (?, ?, ?, ?, ?)",
+				stmt -> {
+					stmt.setString(1, uuid);
+					stmt.setString(2, username);
+					stmt.setString(3, service);
+					stmt.setObject(4, date);
+					stmt.setObject(5, time);
+				}
+		);
+
+		return true;
 	}
 	
 	/**
