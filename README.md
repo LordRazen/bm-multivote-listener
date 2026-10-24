@@ -79,7 +79,7 @@ services:
     ...
 ```
 
-Optional `usermessage` replaces the standard player reward messages. Messages and commands support the placeholders `%name%`, `%service%`, `%amount%`, `%player_name%`, `%month%`, `%year%` (and `%days%` for the streak message).
+Optional `usermessage` replaces the standard player reward messages (the streak bonus message is still sent). Messages and commands support the placeholders `%name%`, `%service%`, `%amount%`, `%player_name%`, `%month%`, `%year%` (and `%days%` for the streak message).
 
 ### Database
 

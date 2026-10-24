@@ -227,7 +227,8 @@ public class VoteEventListener implements Listener {
 				}
 
 				if (streakBonus > 0) {
-					if (player != null && !userMessage) {
+					// sent even if the service has a usermessage: that text only describes the base reward
+					if (player != null) {
 						player.sendMessage(format("messages.player_streak_bonus", username, service)
 								.replace("%days%", String.valueOf(streakDays))
 								.replace("%amount%", String.valueOf(streakBonus)));

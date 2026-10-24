@@ -40,7 +40,7 @@ Soft depends: **PlayerPoints** (points rewards), **LuckPerms** (trophy permissio
 
 ## `config.yml` conventions
 
-- `services.*` entries each define `name` (matched against the incoming Votifier service name), `url`, `enabled`, `money`, `points`, `heal`, `online_commands`, `offline_commands`, optional `usermessage` (suppresses the standard reward messages when set). `services.default` is the fallback when no `name` matches and `enabled: true`.
+- `services.*` entries each define `name` (matched against the incoming Votifier service name), `url`, `enabled`, `money`, `points`, `heal`, `online_commands`, `offline_commands`, optional `usermessage` (suppresses the standard reward messages when set, except the streak bonus message). `services.default` is the fallback when no `name` matches and `enabled: true`.
 - Message strings under `messages.*` support placeholders (`%name%`, `%service%`, `%amount%`, `%player_name%`, `%month%`, `%year%`) substituted via `String.replaceAll`, and `&`-style color codes reformatted by `Tools.reformatColorCodes`.
 - `database.*` configures the HikariCP pool (see README for the full key list); `/mvote reload` reloads `config.yml` but does **not** restart the `DatabaseManager` pool.
 - Editing `src/main/resources/config.yml` is the template shipped in the jar; it's Maven-filtered (`filtering: true`), so `${...}` placeholders (e.g. `${project.version}` in `plugin.yml`) get substituted at build time.

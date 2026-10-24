@@ -89,7 +89,7 @@ vote_streak:
 #   service0:
 #     name: 'some name'	  --> used to identify vote service & as a replacement for %service% in messages+commands
 #     url: 'url'			    --> If a valid URL is provided, the broadcast message will be clickable
-#     usermessage:        -->'Some Text' --> If usermessage is set for service, player_*_reward messages will be suppressed
+#     usermessage:        -->'Some Text' --> If usermessage is set for service, player_*_reward messages will be suppressed (the streak bonus message is still sent)
 #     enabled: true			  --> Enable/disable the service (votes of disabled services are ignored)
 #     money: 100			    --> amount of money (requires Vault)
 #     points: 1				    --> amount of points (requires PlayerPoints)
