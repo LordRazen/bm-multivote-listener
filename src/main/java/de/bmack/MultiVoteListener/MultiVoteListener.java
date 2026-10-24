@@ -9,6 +9,7 @@ import java.time.YearMonth;
 import java.time.ZoneId;
 import java.time.format.TextStyle;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -20,6 +21,7 @@ import de.bmack.MultiVoteListener.database.DatabaseManager;
 import net.luckperms.api.LuckPerms;
 import net.luckperms.api.node.Node;
 import net.luckperms.api.node.NodeType;
+import net.luckperms.api.node.types.InheritanceNode;
 import net.luckperms.api.node.types.PermissionNode;
 import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
@@ -270,6 +272,31 @@ public class MultiVoteListener extends JavaPlugin {
 	private LuckPerms luckPerms() {
 		RegisteredServiceProvider<LuckPerms> provider = Bukkit.getServicesManager().getRegistration(LuckPerms.class);
 		return provider != null ? provider.getProvider() : null;
+	}
+
+	/**
+	 * Returns the names (lowercase) of the groups a player is a direct member of (parent groups that have not
+	 * expired). Blocks while the user is loaded, so it must not be called from the main thread.
+	 *
+	 * @return the group names, or null if LuckPerms is not available or the lookup failed
+	 */
+	public Set<String> getGroups(UUID uuid) {
+		LuckPerms lp = luckPerms();
+		if (lp == null) {
+			return null;
+		}
+		try {
+			Set<String> groups = new HashSet<>();
+			for (InheritanceNode node : lp.getUserManager().loadUser(uuid).join().getNodes(NodeType.INHERITANCE)) {
+				if (node.getValue() && !node.hasExpired()) {
+					groups.add(node.getGroupName().toLowerCase(Locale.ROOT));
+				}
+			}
+			return groups;
+		} catch (RuntimeException e) {
+			getLogger().warning("Could not load LuckPerms user " + uuid + ": " + e.getMessage());
+			return null;
+		}
 	}
 
 	private String prefix() {

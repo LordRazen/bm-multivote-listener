@@ -22,7 +22,7 @@ Requires Java 21 (`maven.compiler.source/target` in `<properties>` say 17, but t
 ## Runtime dependencies
 
 Hard depends (plugin won't enable without them): **Votifier**, **Vault**.
-Soft depends: **PlayerPoints** (points rewards), **LuckPerms** (trophy permissions via the LuckPerms Java API; the streak bonus additionally reads the `luckperms_user_permissions` table, which must be in the same database as `votes`). Vault, PlayerPoints, LuckPerms API are `provided`; HikariCP and the MySQL driver are loaded by Paper via `libraries:` in `plugin.yml` (nothing is shaded).
+Soft depends: **PlayerPoints** (points rewards), **LuckPerms** (trophy permissions via the LuckPerms Java API; the streak bonus checks the player's direct parent groups via `MultiVoteListener#getGroups`, which blocks and must only be called off the main thread). Vault, PlayerPoints, LuckPerms API are `provided`; HikariCP and the MySQL driver are loaded by Paper via `libraries:` in `plugin.yml` (nothing is shaded).
 
 ## Architecture
 
@@ -31,7 +31,7 @@ Soft depends: **PlayerPoints** (points rewards), **LuckPerms** (trophy permissio
   1. Resolve which configured `services.*` entry matches the incoming vote (falls back to `services.default` if enabled, else drops unknown votes).
   2. Normalize the vote timestamp — see the timezone hack below.
   3. Deduplicate + persist the vote to the `votes` table via `saveVoteIfNotExists` (dedup key: uuid + votesite + date); if already voted today for that service, the whole reward flow is skipped.
-  3b. `calculateStreakDays` computes the consecutive-day streak (current month, `vote_streak.services` only) for players in `vote_streak.groups` (LuckPerms group check via `luckperms_user_permissions`); bonus `(days-1) * bonus_per_day` is added to the Vault deposit, once per day, only for votes dated today (Berlin).
+  3b. `calculateStreakDays` computes the consecutive-day streak (current month, `vote_streak.services` only) for players who are a direct parent member of a group in `vote_streak.groups`; bonus `(days-1) * bonus_per_day` is added to the Vault deposit, once per day, only for votes dated today (Berlin).
   4. Broadcast a vote message (with clickable URL via `UrlBroadcast`), then apply rewards: Vault money, PlayerPoints, heal/feed, online commands, offline commands.
 - `database/DatabaseManager` — generic HikariCP wrapper reading `database.*` / `database.hikari.*` from `config.yml`. `executeQuery`/`executeUpdate` take lambda-based `StatementPreparer`/`ResultSetExtractor` for parameterized SQL; `runMigration` runs raw DDL. Plugin disables itself if pool init or the initial migration fails.
 - `commands/CommandHandler` — implements `/mvote` (`reload`, `status`, `services`, `give-trophies`, `receive-trophies <player>`, `testvote <player> [service]` (fires a synthetic `VotifierEvent` through the normal flow, no dedup bypass), default → usage). Permission check requires OP or `mvote.admin`.

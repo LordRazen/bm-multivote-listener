@@ -58,14 +58,14 @@ trophy_head_command: 'minecraft:give %player_name% minecraft:player_head[custom_
 monthly_vote_reward_money: 5000
 
 #
-# Vote streak: players in one of the listed LuckPerms groups get an extra bonus for voting
+# Vote streak: players who are a direct member (parent) of one of the listed LuckPerms groups get an extra bonus for voting
 # on consecutive days within a month. Day 1 = normal reward, day N = normal reward + (N-1) * bonus_per_day.
 # The streak restarts on a gap and on the 1st of each month. The bonus is paid once per day.
 #
 # enabled        - Enable/disable the streak bonus
 # bonus_per_day  - Coins per additional streak day
 # max_streak_days - Upper limit for the streak length (safety cap, 0 = no limit)
-# groups         - LuckPerms groups (without "group." prefix) that receive the bonus
+# groups         - LuckPerms groups (parents, without "group." prefix) that receive the bonus
 # services       - Vote services (= services.*.name) that count for the streak
 #
 vote_streak:

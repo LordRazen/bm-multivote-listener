@@ -289,7 +289,7 @@ public class VoteEventListener implements Listener {
 	 * if this vote qualifies for the streak bonus, otherwise 0.
 	 *
 	 * A vote qualifies if the streak is enabled, the service counts for the streak, the player
-	 * is in one of the configured groups, the vote is for today and it is the first
+	 * is a direct member (parent) of one of the configured LuckPerms groups, the vote is for today and it is the first
 	 * streak-service vote of the day.
 	 */
 	private int calculateStreakDays(String uuid, String service, LocalDate voteDate) {
@@ -307,32 +307,14 @@ public class VoteEventListener implements Listener {
 		}
 
 		String servicePlaceholders = String.join(",", Collections.nCopies(streakServices.size(), "?"));
-		String groupPlaceholders = String.join(",", Collections.nCopies(groups.size(), "?"));
+		// only players that are a direct member (parent) of one of the configured LuckPerms groups qualify
+		Set<String> playerGroups = plugin.getGroups(UUID.fromString(uuid));
+		if (playerGroups == null || groups.stream().noneMatch(group -> playerGroups.contains(group.toLowerCase(Locale.ROOT)))) {
+			plugin.getLogger().info("No vote streak bonus for uuid " + uuid + ": groups are " + playerGroups + ", required one of " + groups);
+			return 0;
+		}
 
 		try {
-			// expiry = 0 means permanent; skip temporary group memberships that already ran out
-			Boolean eligible;
-			try {
-				eligible = plugin.getDatabaseManager().executeQuery(
-						"SELECT 1 FROM luckperms_user_permissions WHERE uuid = ? AND value = 1 AND (expiry = 0 OR expiry > UNIX_TIMESTAMP()) AND permission IN (" + groupPlaceholders + ")",
-						stmt -> {
-							stmt.setString(1, uuid);
-							for (int i = 0; i < groups.size(); i++) {
-								// LuckPerms stores group names lowercase
-								stmt.setString(i + 2, "group." + groups.get(i).toLowerCase(Locale.ROOT));
-							}
-						},
-						rs -> rs.next()
-				);
-			} catch (SQLException exception) {
-				plugin.getLogger().warning("Could not read luckperms_user_permissions (must be in the same database as the votes table) - vote streak bonus is skipped for uuid "
-						+ uuid + ": " + exception.getMessage());
-				return 0;
-			}
-			if (!Boolean.TRUE.equals(eligible)) {
-				return 0;
-			}
-
 			List<LocalDate> voteDays = plugin.getDatabaseManager().executeQuery(
 					"SELECT DISTINCT date FROM votes WHERE uuid = ? AND date BETWEEN ? AND ? AND votesite IN (" + servicePlaceholders + ") ORDER BY date DESC",
 					stmt -> {

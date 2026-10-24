@@ -21,7 +21,7 @@
 | --- | --- |
 | Required | Votifier, Vault |
 | Optional | PlayerPoints (points rewards) |
-| Optional | LuckPerms (vote trophies via its API; streak groups are read from `luckperms_user_permissions`, same database as `votes`) |
+| Optional | LuckPerms (vote trophies and streak groups, both via its API) |
 
 - Java 21
 - A MySQL/MariaDB database. The plugin creates the `votes` table on startup and disables itself if the connection pool or the migration fails.
@@ -107,14 +107,14 @@ database:
 
 ### Vote streak
 
-Players in one of the configured LuckPerms groups receive a bonus for voting on consecutive days within a month: day 1 gets the normal reward, day N gets the normal reward plus `(N-1) * bonus_per_day`. A gap or a new month resets the streak. The bonus is paid once per day.
+Players who are a direct member (parent) of one of the configured LuckPerms groups receive a bonus for voting on consecutive days within a month: day 1 gets the normal reward, day N gets the normal reward plus `(N-1) * bonus_per_day`. A gap or a new month resets the streak. The bonus is paid once per day.
 
 ```yml
 vote_streak:
   enabled: true
   bonus_per_day: 50
   max_streak_days: 30                # safety cap, 0 = no limit
-  groups: ['neuling', 'entdecker']   # LuckPerms groups (read from luckperms_user_permissions)
+  groups: ['neuling', 'entdecker']   # LuckPerms groups (parents) that receive the bonus
   services: ['minecraft-server.eu']  # vote services (services.*.name) that count for the streak
 ```
 
