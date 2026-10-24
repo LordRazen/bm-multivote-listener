@@ -184,7 +184,9 @@ public class MultiVoteListener extends JavaPlugin {
 			problems.add("'services' section is missing");
 		} else {
 			for (String id : services.getKeys(false)) {
-				if (services.getString(id + ".name") == null) {
+				// a disabled default service (e.g. just "enabled: false") needs no name
+				boolean optional = id.equals("default") && !services.getBoolean("default.enabled");
+				if (!optional && services.getString(id + ".name") == null) {
 					problems.add("'services." + id + ".name' is missing");
 				}
 			}
