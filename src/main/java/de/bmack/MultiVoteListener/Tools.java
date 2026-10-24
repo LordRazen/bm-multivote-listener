@@ -20,7 +20,7 @@ public class Tools {
      */ 
     public static String reformatColorCodes(String input) {
     	String output = input;
-    	output = output.replaceAll("&(?!0-9a-fA-Fk-oK-OrR)", "§");
+    	output = output.replaceAll("&(?=[0-9a-fA-Fk-oK-OrR])", "§");
     	return output;
     }
     
@@ -33,7 +33,7 @@ public class Tools {
      */ 
     public static String stripColorCodes(String input) {
     	String output = input;
-    	output = output.replaceAll("&[0-9a-fA-Fk-oK-OrR]{1}", "");
+    	output = output.replaceAll("&[0-9a-fA-Fk-oK-OrR]", "");
     	return output;
     }
     
@@ -59,9 +59,9 @@ public class Tools {
     	List<String> stateList = new ArrayList<String>();
 		stateList.add("Status:");
 		stateList.add("---------------------------------------");
-    	stateList.add(Tools.stateMessage("Spigot Server", plugin.isSpigot()));
     	stateList.add(Tools.stateMessage("Vault", plugin.isEnabledVaultEco()));
     	stateList.add(Tools.stateMessage("PlayerPoints", plugin.isEnabledPoints()));
+    	stateList.add(Tools.stateMessage("LuckPerms", plugin.isLuckPermsAvailable()));
     	return stateList;
     }
     
@@ -72,6 +72,7 @@ public class Tools {
     	usageList.add("reload     - Reload config file from disk");
     	usageList.add("services  - List available vote services");
     	usageList.add("status     - Show active plugin hooks");
+    	usageList.add("testvote player [service] - Simulate a vote");
     	usageList.add("help        - This information");
 		usageList.add("Vote-Trophy Commands:");
 		usageList.add("---------------------------------------");

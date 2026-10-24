@@ -1,21 +1,31 @@
 package de.bmack.MultiVoteListener.listeners;
 
-import java.sql.*;
-
-import java.sql.Date;
+import java.sql.SQLException;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
-import java.util.*;
-
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Set;
+import java.util.UUID;
+import java.util.regex.Pattern;
 
 import de.bmack.MultiVoteListener.MultiVoteListener;
 import de.bmack.MultiVoteListener.Tools;
 
 import de.bmack.MultiVoteListener.UrlBroadcast;
-import de.bmack.MultiVoteListener.utils.Logger;
+import net.milkbowl.vault.economy.Economy;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
+import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeInstance;
+import org.bukkit.configuration.ConfigurationSection;
+import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -23,300 +33,359 @@ import org.bukkit.event.Listener;
 
 import com.vexsoftware.votifier.model.VotifierEvent;
 import com.vexsoftware.votifier.model.Vote;
-import com.earth2me.essentials.User;
-import com.earth2me.essentials.Essentials;
 
 /**
  * Listener implementation for Vote Events.
- * 
+ *
  * The listener will catch and handle VotifierEvents.
- * 
+ *
  * @author		bmack94
- */ 
+ */
 public class VoteEventListener implements Listener {
 
-	private MultiVoteListener plugin;
-	
+	// URL regex to check config
+	private static final Pattern URL_PATTERN = Pattern.compile("^(https?)://[-a-zA-Z0-9+&@#/%?=~_|!:,.;]*[-a-zA-Z0-9+&@#/%=~_|]");
+	// Only plain Minecraft names are accepted: the name is inserted into console commands
+	private static final Pattern USERNAME_PATTERN = Pattern.compile("^[A-Za-z0-9_]{1,16}$");
+
+	private final MultiVoteListener plugin;
+
 	/**
-     * Constructor.
-     * 
-     * The entire command handling is done here.
-     * 
+     * Constructor. Registers the listener.
+     *
      * @param		plugin
-     */ 
+     */
 	public VoteEventListener(MultiVoteListener plugin) {
         this.plugin = plugin;
-        // Register events
         plugin.getServer().getPluginManager().registerEvents(this, plugin);
-        
     }
 
 	/**
      * EventHandler
      * Actions happening on VotifierEvents.
-     * 
-     * The entire command handling is done here.
-     * 
+     *
+     * Service lookup and normalisation run on the calling (main) thread, the database work runs asynchronously
+     * and the rewards are handed out on the main thread again.
+     *
      * @param		e
-     */ 
+     */
 	@EventHandler(priority = EventPriority.NORMAL)
 	public void onVote(VotifierEvent e) {
-		// URL regex to check config
-		String url_regex = "^(https?)://[-a-zA-Z0-9+&@#/%?=~_|!:,.;]*[-a-zA-Z0-9+&@#/%=~_|]";
-		
-		String service = "";
-		String serviceUrl = "";
-		String serviceId = "";
-		String username = "";
-		
-		String message = "";
-		String broadcast = "";
-		
-		Set<String> serviceNames;
-		boolean knownService = false;
-		boolean defaultService = false;
-		
-		boolean userMessage = false;
-		
-		OfflinePlayer user;
+		if (!plugin.isConfigValid()) {
+			plugin.getLogger().warning("Config is invalid, vote ignored. Fix config.yml and run /mvote reload.");
+			return;
+		}
 
+		FileConfiguration config = plugin.getConfig();
 		Vote vote = e.getVote();
-		
-		service = vote.getServiceName();
-		username = vote.getUsername();
-		
-		// Check, if vote service is configured
-		// If unknown, do nothing
-		
-		if(plugin.getConfig().isSet("services.default") && plugin.getConfig().getBoolean("services.default.enabled")) {
-			defaultService = true;
-		}
-		
-		serviceNames = plugin.getConfig().getConfigurationSection("services").getKeys(false);
-		for (Iterator<String> iterator = serviceNames.iterator(); iterator.hasNext(); ) {
-			  serviceId = iterator.next();
-			  if(plugin.getConfig().getString("services."+serviceId+".name").equals(service)) {
-				  knownService = true;
-				  break;
-			  }
-		}
-		
-		// Exit if service is unknown - we will ignore this for now
-		if(!knownService) {
-			if(defaultService) {
-				serviceId = "default";
-			}
-			else {
-				System.out.println(Tools.stripColorCodes(plugin.getConfig().getString("message_prefix")) + "Vote from unknown service: "+service);
-				System.out.println(Tools.stripColorCodes(plugin.getConfig().getString("message_prefix")) + "Default service is disabled in config.");
-				return;	
-			}
-		}
-		
+		String incomingService = vote.getServiceName();
+		String username = vote.getUsername();
 
-		
-		//Bukkit.getServer().spigot().broadcast(component);
-		
-		// get money amount
-		int money_reward = plugin.getConfig().getInt("services." + serviceId + ".money");
-		// get points amount
-		int points_reward = plugin.getConfig().getInt("services." + serviceId + ".points");
-		// get commands
-		List<String> commands = plugin.getConfig().getStringList("services." + serviceId + ".online_commands");
-		List<String> commands_offline = plugin.getConfig().getStringList("services." + serviceId + ".offline_commands");
-		
-		if(serviceId.equals("default")) {
-			service = plugin.getConfig().getString("services.default.name");
+		if (username == null || !USERNAME_PATTERN.matcher(username).matches()) {
+			plugin.getLogger().warning("Vote from service " + incomingService + " ignored: invalid username '" + username + "'");
+			return;
 		}
-		
-		if(plugin.getConfig().isSet("services."+serviceId+".url") && plugin.getConfig().getString("services."+serviceId+".url").matches(url_regex)) {
-			serviceUrl = plugin.getConfig().getString("services."+serviceId+".url");
+
+		String serviceId = resolveServiceId(config, incomingService);
+		if (serviceId == null) {
+			return;
 		}
-		else {
+		String service = config.getString("services." + serviceId + ".name", incomingService);
+
+		// try to fetch UUID
+		OfflinePlayer user = Bukkit.getOfflinePlayer(username);
+		UUID uuid = user.getUniqueId();
+
+		ZonedDateTime zdt = parseVoteTime(vote);
+		LocalDate voteDate = zdt.toLocalDate();
+		LocalTime voteTime = zdt.toLocalTime();
+
+		Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+			try {
+				if (!saveVoteIfNotExists(uuid.toString(), username, service, voteDate, voteTime)) {
+					plugin.getLogger().info("User " + username + " has already voted on " + service + " at " + voteDate + " " + voteTime);
+					return;
+				}
+			} catch (SQLException exception) {
+				plugin.getLogger().severe("Database error while checking/inserting vote from user " + username + " on service " + service
+						+ " at " + voteDate + " " + voteTime + ": " + exception.getMessage());
+				return;
+			}
+
+			// The vote is stored at this point; a failing streak lookup must never block the base reward.
+			int streakDays = 0;
+			try {
+				streakDays = calculateStreakDays(uuid.toString(), service, voteDate);
+			} catch (RuntimeException exception) {
+				plugin.getLogger().severe("Error while calculating vote streak for user " + username + " on service " + service
+						+ ", continuing without streak bonus: " + exception.getMessage());
+			}
+
+			int finalStreakDays = streakDays;
+			Bukkit.getScheduler().runTask(plugin, () -> giveRewards(uuid, username, service, serviceId, finalStreakDays));
+		});
+	}
+
+	/**
+	 * Finds the config id of the service a vote belongs to.
+	 *
+	 * @return the id (a key below "services"), or null if the vote has to be ignored
+	 */
+	private String resolveServiceId(FileConfiguration config, String incomingService) {
+		ConfigurationSection services = config.getConfigurationSection("services");
+		if (services != null) {
+			for (String id : services.getKeys(false)) {
+				if (id.equals("default") || !incomingService.equals(services.getString(id + ".name"))) {
+					continue;
+				}
+				if (!services.getBoolean(id + ".enabled", true)) {
+					plugin.getLogger().info("Vote from disabled service ignored: " + incomingService);
+					return null;
+				}
+				return id;
+			}
+		}
+
+		if (config.isSet("services.default") && config.getBoolean("services.default.enabled")) {
+			return "default";
+		}
+		plugin.getLogger().info("Vote from unknown service ignored: " + incomingService + " (default service is disabled in config)");
+		return null;
+	}
+
+	/**
+	 * Normalizes the vote timestamp.
+	 *
+	 * The timezone handling is service-name-keyed by observation:
+	 * minecraft-server.eu sends the Berlin wall clock time as epoch, so it has to be read as GMT,
+	 * every other service sends real epoch values which are read as Europe/Berlin.
+	 * An unparsable timestamp falls back to the current time.
+	 */
+	private ZonedDateTime parseVoteTime(Vote vote) {
+		Instant instant;
+		try {
+			String timestamp = vote.getTimeStamp().trim();
+			long ts = Long.parseLong(timestamp);
+			if (timestamp.length() == 10) {
+				ts = ts * 1000;
+			}
+			instant = Instant.ofEpochMilli(ts);
+		} catch (RuntimeException exception) {
+			plugin.getLogger().warning("Vote from " + vote.getServiceName() + " has an invalid timestamp '" + vote.getTimeStamp()
+					+ "', using the current time.");
+			instant = Instant.now();
+		}
+		if ("minecraft-server.eu".equals(vote.getServiceName())) {
+			return instant.atZone(ZoneId.of("GMT"));
+		}
+		return instant.atZone(MultiVoteListener.ZONE);
+	}
+
+	/**
+	 * Hands out all rewards of a stored vote. Must run on the main thread.
+	 */
+	private void giveRewards(UUID uuid, String username, String service, String serviceId, int streakDays) {
+		FileConfiguration config = plugin.getConfig();
+		String servicePath = "services." + serviceId;
+
+		int moneyReward = config.getInt(servicePath + ".money");
+		int pointsReward = config.getInt(servicePath + ".points");
+		List<String> onlineCommands = config.getStringList(servicePath + ".online_commands");
+		List<String> offlineCommands = config.getStringList(servicePath + ".offline_commands");
+		boolean userMessage = config.isSet(servicePath + ".usermessage");
+
+		String serviceUrl = config.getString(servicePath + ".url");
+		if (serviceUrl == null || !URL_PATTERN.matcher(serviceUrl).matches()) {
 			serviceUrl = null;
 		}
 
-		// try to fetch UUID
-		user = Bukkit.getOfflinePlayer(username);
-		Essentials ess = (Essentials) Bukkit.getServer()
-                .getPluginManager().getPlugin("Essentials");
-		User essUser = ess.getUser(username);
-		
-		if(plugin.getConfig().isSet("services."+serviceId+".usermessage") ) {
-			userMessage = true;
-		}
+		OfflinePlayer user = Bukkit.getOfflinePlayer(uuid);
+		Player player = user.getPlayer();
+		String logPrefix = Tools.stripColorCodes(config.getString("message_prefix", "")) + "Service: " + service + "/Player: " + username + " - ";
 
-		//Logging to Database
-		String voter = (username);
-		UUID voteruuid = user.getUniqueId();
-		String UUIDString = voteruuid.toString();
-		String timestamp = vote.getTimeStamp();
+		// broadcast
+		broadcast(format("messages.broadcast_vote_success", username, service), serviceUrl);
 
-		/*
-		* tatsächliche Zeit: 16:26
-			minecraft-server.eu: 1775146907 = 16:26 in GMT, 18:26 in GMT+2 => in der DB: 18:26
-			=> Geht man davon aus, dass der Server die "richtige" Zeit verwendet müsste der Server also GMT timestamps senden
-
-			minecraft-serverlist.net: 1775139778 = 14:26 in GMT, 16:26 in GMT+2 => in der DB: 16:26
-			=> Da hier der GMT+2 Wert korrekt ist, ist der Server wohl GMT+2*/
-		long ts = Long.parseLong(timestamp);
-		if (timestamp.length() == 10) {
-			ts = ts*1000;
-		}
-		Instant instant = Instant.ofEpochMilli(ts);
-		ZonedDateTime zdt;
-		String serviceName = vote.getServiceName();
-		switch(serviceName){
-
-			case "minecraft-server.eu" ->{
-				zdt = instant.atZone(ZoneId.of("GMT"));
-			}
-			default -> {
-				zdt = instant.atZone(ZoneId.of("Europe/Berlin"));
+		// General thx message + usermessage if defined for service
+		if (player != null) {
+			player.sendMessage(format("messages.player_vote_success", username, service).replace("%amount%", String.valueOf(moneyReward)));
+			if (userMessage) {
+				player.sendMessage(Tools.reformatColorCodes(config.getString("message_prefix", "") + config.getString(servicePath + ".usermessage")));
 			}
 		}
-		try {
-			boolean inserted = saveVoteIfNotExists(UUIDString, voter, service, zdt.toLocalDate(), zdt.toLocalTime());
-			if (!inserted) {
-				System.out.println(Tools.stripColorCodes(plugin.getConfig().getString("message_prefix")) + "User " + username + " has already voted on " + service + " at " + zdt.toLocalDate() + " " + zdt.toLocalTime());
-				return;
-			}
-		} catch (SQLException exception) {
-			exception.printStackTrace();
-			Logger.info("Database error while checking/inserting vote from user "+username+" on service "+service+" at "+zdt.toLocalDate()+" "+zdt.toLocalTime());
-			return;
-		}
 
+		// vault action
+		Economy economy = plugin.getEcoAPI();
+		if (economy != null) {
+			int streakBonus = streakDays > 1 ? (streakDays - 1) * config.getInt("vote_streak.bonus_per_day") : 0;
+			if (economy.hasAccount(user) && moneyReward + streakBonus > 0) {
+				economy.depositPlayer(user, moneyReward + streakBonus);
 
-
-
-
-
-		
-		// Compose a broadcast-message
-		broadcast = Tools.reformatColorCodes(plugin.getConfig().getString("message_prefix")+plugin.getConfig().getString("messages.broadcast_vote_success"));
-		broadcast = broadcast.replaceAll("%name%", username);
-		broadcast = broadcast.replaceAll("%service%", service);
-		
-//		TextComponent spigotBroadcast = new TextComponent(broadcast);
-//		
-//		if(serviceUrl != null) {
-//			spigotBroadcast.setClickEvent(new ClickEvent(ClickEvent.Action.OPEN_URL, serviceUrl));	
-//		}
-		
-		// Check if the player is known on the server.
-		// If not, do nothing...
-/*		if(!user.hasPlayedBefore() && !user.isOnline()) {
-			if(plugin.getConfig().getBoolean("allow_fake_names")) {
-				//Bukkit.getServer().spigot().broadcast(spigotBroadcast);
-				broadcast(broadcast,serviceUrl);
-			}
-			System.out.println("Unknown user voted on "+serviceUrl+": " + user.getName());
-			return;
-		}
-		else {*/
-			// broadcast
-			//Bukkit.getServer().spigot().broadcast(spigotBroadcast);
-			broadcast(broadcast,serviceUrl);
-			
-			// General thx message + usermessage if defined for service
-			if(user.isOnline()) {
-				// Player thx message
-				message = Tools.reformatColorCodes(plugin.getConfig().getString("message_prefix")+plugin.getConfig().getString("messages.player_vote_success"));
-				message = message.replaceAll("%name%", username);
-				message = message.replaceAll("%service%", service);
-				message = message.replaceAll("%amount%", ""+money_reward);
-				Player.class.cast(user).sendMessage(message);
-				if(userMessage) {
-					message = Tools.reformatColorCodes(plugin.getConfig().getString("message_prefix")+plugin.getConfig().getString("services."+serviceId+".usermessage"));
-					Player.class.cast(user).sendMessage(message);
+				// base money message only if there is a base reward (the streak bonus has its own message)
+				if (moneyReward > 0 && player != null && !userMessage) {
+					player.sendMessage(format("messages.player_money_reward", username, service).replace("%amount%", String.valueOf(moneyReward)));
 				}
-			}			
-			message = "";
 
-
-
-
-
-
-			//System.out.println("Timestamp: " + timestamp + " | Date: " + zdt.toLocalDate() + " | Time: " + zdt.toLocalTime());
-			
-			// vault action
-			if(plugin.isEnabledVaultEco()) {
-				if(plugin.getEcoAPI().hasAccount(user) && money_reward > 0) {
-					plugin.getEcoAPI().depositPlayer(user,money_reward);
-					
-					message = Tools.reformatColorCodes(plugin.getConfig().getString("message_prefix")+plugin.getConfig().getString("messages.player_money_reward"));
-					message = message.replaceAll("%name%", username);
-					message = message.replaceAll("%service%", service);
-					message = message.replaceAll("%amount%", ""+money_reward);
-					if(user.isOnline() && message.length() > 1 && !userMessage) {
-						Player.class.cast(user).sendMessage(message);						
+				if (streakBonus > 0) {
+					if (player != null && !userMessage) {
+						player.sendMessage(format("messages.player_streak_bonus", username, service)
+								.replace("%days%", String.valueOf(streakDays))
+								.replace("%amount%", String.valueOf(streakBonus)));
 					}
-					message = Tools.stripColorCodes(plugin.getConfig().getString("message_prefix")) + "Service: "+service+"/Player: " + username + " - Vault transaction: +"+ money_reward;
-					System.out.println(message);
-					message = "";
+					plugin.getLogger().info(logPrefix + "Vote streak: " + streakDays + " days, bonus +" + streakBonus);
 				}
+
+				plugin.getLogger().info(logPrefix + "Vault transaction: +" + (moneyReward + streakBonus));
 			}
-			// player points action
-			if(plugin.isEnabledPoints() && points_reward > 0) {
-				
-				
-				plugin.getPointsAPI().give(essUser.getUUID(), points_reward);
-				
-				message = Tools.reformatColorCodes(plugin.getConfig().getString("message_prefix")+plugin.getConfig().getString("messages.player_points_reward"));
-				message = message.replaceAll("%name%", username);
-				message = message.replaceAll("%service%", service);
-				if(user.isOnline() && message.length() > 1 && !userMessage) {
-					Player.class.cast(user).sendMessage(message);	
-				}
-				message = Tools.stripColorCodes(plugin.getConfig().getString("message_prefix")) +  "Service: "+service+"/Player: " + username + " - PlayerPoints: +"+ points_reward;
-				System.out.println(message);
-				message = "";
+		}
+
+		// player points action
+		if (plugin.isEnabledPoints() && pointsReward > 0) {
+			plugin.getPointsAPI().give(uuid, pointsReward);
+			if (player != null && !userMessage) {
+				player.sendMessage(format("messages.player_points_reward", username, service));
 			}
-			// heal action
-			if(plugin.getConfig().getBoolean("services."+serviceId+".heal") && user.isOnline()) {
-				Player.class.cast(user).setHealth(Player.class.cast(user).getMaxHealth());
-				if(Player.class.cast(user).getFoodLevel() < 20) {
-					Player.class.cast(user).setFoodLevel(20);	
-				}
-				message = Tools.reformatColorCodes(plugin.getConfig().getString("message_prefix")+plugin.getConfig().getString("messages.player_heal_reward"));
-				message = message.replaceAll("%name%", username);
-				message = message.replaceAll("%service%", service);
-				message = message.replaceAll("%amount%", "");
-				if(user.isOnline() && message.length() > 1 && !userMessage) {
-					Player.class.cast(user).sendMessage(message);
-				}
-				message = Tools.stripColorCodes(plugin.getConfig().getString("message_prefix")) +  "Service: "+service+"/Player: " + username + " - Healed";
-				System.out.println(message);
-				message = "";
+			plugin.getLogger().info(logPrefix + "PlayerPoints: +" + pointsReward);
+		}
+
+		// heal action
+		if (config.getBoolean(servicePath + ".heal") && player != null) {
+			AttributeInstance maxHealth = player.getAttribute(Attribute.MAX_HEALTH);
+			player.setHealth(maxHealth != null ? maxHealth.getValue() : 20.0);
+			if (player.getFoodLevel() < 20) {
+				player.setFoodLevel(20);
 			}
-			// command actions
-			if(!commands.isEmpty() && user.isOnline()) {
-				for ( Iterator<String> iterator = commands.iterator(); iterator.hasNext(); ) {
-					message = iterator.next();
-					message = message.replaceAll("%name%", username);
-					message = message.replaceAll("%service%", service);
-					message = message.replaceAll("%amount%", "");					  
-					Bukkit.getServer().dispatchCommand(plugin.getServer().getConsoleSender(), message);
-					message = "";
-				}
+			if (!userMessage) {
+				player.sendMessage(format("messages.player_heal_reward", username, service));
 			}
-			if(!commands_offline.isEmpty()) {
-				for ( Iterator<String> iterator = commands_offline.iterator(); iterator.hasNext(); ) {
-					message = iterator.next();
-					message = message.replaceAll("%name%", username);
-					message = message.replaceAll("%service%", service);
-					message = message.replaceAll("%amount%", "");					  
-					Bukkit.getServer().dispatchCommand(plugin.getServer().getConsoleSender(), message);
-					message = "";
-				}
-			}
-		//}
-		return;
+			plugin.getLogger().info(logPrefix + "Healed");
+		}
+
+		// command actions
+		if (player != null) {
+			runCommands(onlineCommands, username, service);
+		}
+		runCommands(offlineCommands, username, service);
 	}
 
-	private boolean saveVoteIfNotExists(String uuid, String username, String service, java.time.LocalDate date, java.time.LocalTime time) throws SQLException {
+	private void runCommands(List<String> commands, String username, String service) {
+		for (String command : commands) {
+			Bukkit.getServer().dispatchCommand(plugin.getServer().getConsoleSender(),
+					command.replace("%name%", username).replace("%service%", service).replace("%amount%", ""));
+		}
+	}
+
+	/** Builds prefix + message with the %name% and %service% placeholders replaced. */
+	private String format(String messagePath, String username, String service) {
+		FileConfiguration config = plugin.getConfig();
+		return Tools.reformatColorCodes(config.getString("message_prefix", "") + config.getString(messagePath, ""))
+				.replace("%name%", username)
+				.replace("%service%", service);
+	}
+
+	/**
+	 * Returns the current streak length (consecutive vote days within the month of voteDate)
+	 * if this vote qualifies for the streak bonus, otherwise 0.
+	 *
+	 * A vote qualifies if the streak is enabled, the service counts for the streak, the player
+	 * is in one of the configured groups, the vote is for today and it is the first
+	 * streak-service vote of the day.
+	 */
+	private int calculateStreakDays(String uuid, String service, LocalDate voteDate) {
+		if (!plugin.getConfig().getBoolean("vote_streak.enabled")) {
+			return 0;
+		}
+		List<String> streakServices = plugin.getConfig().getStringList("vote_streak.services");
+		List<String> groups = plugin.getConfig().getStringList("vote_streak.groups");
+		if (!streakServices.contains(service) || groups.isEmpty()) {
+			return 0;
+		}
+		// late delivered votes must not trigger the bonus again
+		if (!voteDate.equals(LocalDate.now(MultiVoteListener.ZONE))) {
+			return 0;
+		}
+
+		String servicePlaceholders = String.join(",", Collections.nCopies(streakServices.size(), "?"));
+		String groupPlaceholders = String.join(",", Collections.nCopies(groups.size(), "?"));
+
+		try {
+			// expiry = 0 means permanent; skip temporary group memberships that already ran out
+			Boolean eligible;
+			try {
+				eligible = plugin.getDatabaseManager().executeQuery(
+						"SELECT 1 FROM luckperms_user_permissions WHERE uuid = ? AND value = 1 AND (expiry = 0 OR expiry > UNIX_TIMESTAMP()) AND permission IN (" + groupPlaceholders + ")",
+						stmt -> {
+							stmt.setString(1, uuid);
+							for (int i = 0; i < groups.size(); i++) {
+								// LuckPerms stores group names lowercase
+								stmt.setString(i + 2, "group." + groups.get(i).toLowerCase(Locale.ROOT));
+							}
+						},
+						rs -> rs.next()
+				);
+			} catch (SQLException exception) {
+				plugin.getLogger().warning("Could not read luckperms_user_permissions (must be in the same database as the votes table) - vote streak bonus is skipped for uuid "
+						+ uuid + ": " + exception.getMessage());
+				return 0;
+			}
+			if (!Boolean.TRUE.equals(eligible)) {
+				return 0;
+			}
+
+			List<LocalDate> voteDays = plugin.getDatabaseManager().executeQuery(
+					"SELECT DISTINCT date FROM votes WHERE uuid = ? AND date BETWEEN ? AND ? AND votesite IN (" + servicePlaceholders + ") ORDER BY date DESC",
+					stmt -> {
+						stmt.setString(1, uuid);
+						stmt.setObject(2, voteDate.withDayOfMonth(1));
+						stmt.setObject(3, voteDate);
+						for (int i = 0; i < streakServices.size(); i++) {
+							stmt.setString(i + 4, streakServices.get(i));
+						}
+					},
+					rs -> {
+						List<LocalDate> days = new ArrayList<>();
+						while (rs.next()) {
+							days.add(rs.getObject("date", LocalDate.class));
+						}
+						return days;
+					}
+			);
+
+			// bonus only on the first streak-service vote of the day
+			Integer votesToday = plugin.getDatabaseManager().executeQuery(
+					"SELECT COUNT(*) FROM votes WHERE uuid = ? AND date = ? AND votesite IN (" + servicePlaceholders + ")",
+					stmt -> {
+						stmt.setString(1, uuid);
+						stmt.setObject(2, voteDate);
+						for (int i = 0; i < streakServices.size(); i++) {
+							stmt.setString(i + 3, streakServices.get(i));
+						}
+					},
+					rs -> rs.next() ? rs.getInt(1) : 0
+			);
+			if (votesToday == null || votesToday != 1) {
+				return 0;
+			}
+
+			Set<LocalDate> daySet = new HashSet<>(voteDays);
+			int days = 0;
+			LocalDate day = voteDate;
+			while (daySet.contains(day)) {
+				days++;
+				day = day.minusDays(1);
+			}
+			int maxStreakDays = plugin.getConfig().getInt("vote_streak.max_streak_days");
+			return maxStreakDays > 0 ? Math.min(days, maxStreakDays) : days;
+		} catch (SQLException exception) {
+			plugin.getLogger().severe("Database error while calculating vote streak for uuid " + uuid + ": " + exception.getMessage());
+			return 0;
+		}
+	}
+
+	/**
+	 * @return true if the vote was stored, false if the player already voted on this service on that date
+	 */
+	private boolean saveVoteIfNotExists(String uuid, String username, String service, LocalDate date, LocalTime time) throws SQLException {
 		Boolean alreadyVoted = plugin.getDatabaseManager().executeQuery(
 				"SELECT 1 FROM votes WHERE uuid = ? AND votesite = ? AND date = ?",
 				stmt -> {
@@ -331,8 +400,9 @@ public class VoteEventListener implements Listener {
 			return false;
 		}
 
-		plugin.getDatabaseManager().executeUpdate(
-				"INSERT INTO votes (uuid, username, votesite, date, time) VALUES (?, ?, ?, ?, ?)",
+		// INSERT IGNORE + unique key: a concurrent duplicate affects 0 rows instead of being rewarded twice
+		int inserted = plugin.getDatabaseManager().executeUpdate(
+				"INSERT IGNORE INTO votes (uuid, username, votesite, date, time) VALUES (?, ?, ?, ?, ?)",
 				stmt -> {
 					stmt.setString(1, uuid);
 					stmt.setString(2, username);
@@ -342,34 +412,17 @@ public class VoteEventListener implements Listener {
 				}
 		);
 
-		return true;
+		return inserted > 0;
 	}
-	
+
 	/**
-     * Wrapper method for message broadcast based on underlying server.
-     * 
-     * The method uses Java reflection to dynamically load and use Bungee Chat API and
-     * Spigot-specific broadcast when available to add an OPEN_URL ClickEvent to the message.
-     * 
-     * Otherwise default Bukkit broadcast is used.
-     * 
+     * Broadcast a message to all players and the console, with an OPEN_URL click event if a url is given.
+     *
      * @param		message
      * @param		url
      * @see			de.bmack.MultiVoteListener.UrlBroadcast
-     */ 
+     */
 	public void broadcast(String message, String url) {
-		if(plugin.isSpigot()) {
-			try {
-				UrlBroadcast.doBroadcast(plugin, message, url);
-			}
-			catch (NullPointerException cnfe) {
-				System.out.println(cnfe.getMessage());
-				cnfe.printStackTrace(System.out);
-				plugin.getServer().broadcastMessage(message);
-			}
-		}
-		else {
-			plugin.getServer().broadcastMessage(message);
-		}
+		UrlBroadcast.doBroadcast(plugin, message, url);
 	}
 }

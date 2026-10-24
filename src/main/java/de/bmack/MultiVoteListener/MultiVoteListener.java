@@ -1,25 +1,35 @@
 package de.bmack.MultiVoteListener;
 
 import java.io.File;
+import java.io.IOException;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.Month;
 import java.time.YearMonth;
+import java.time.ZoneId;
 import java.time.format.TextStyle;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
-import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 
 import de.bmack.MultiVoteListener.database.DatabaseManager;
-import de.bmack.MultiVoteListener.utils.Logger;
-import org.bukkit.OfflinePlayer;
+import net.luckperms.api.LuckPerms;
+import net.luckperms.api.node.Node;
+import net.luckperms.api.node.NodeType;
+import net.luckperms.api.node.types.PermissionNode;
+import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
+import org.bukkit.command.PluginCommand;
+import org.bukkit.configuration.ConfigurationSection;
+import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.Bukkit;
-import org.bukkit.configuration.file.FileConfiguration;
 
 import net.milkbowl.vault.economy.Economy;
 
@@ -29,30 +39,31 @@ import org.black_ixx.playerpoints.PlayerPointsAPI;
 import de.bmack.MultiVoteListener.commands.CommandHandler;
 import de.bmack.MultiVoteListener.listeners.VoteEventListener;
 
-import static org.bukkit.Bukkit.getOfflinePlayer;
-
 /**
  * Main class of the MultiVotePlugin
- * 
+ *
  * @author 		bmack94
  */
 public class MultiVoteListener extends JavaPlugin {
 
-	public FileConfiguration config;
+	/** Timezone used for all date based logic (vote dedup, streak, monthly trophy run). */
+	public static final ZoneId ZONE = ZoneId.of("Europe/Berlin");
+
+	private static final String TROPHY_PERMISSION_PREFIX = "blockminers.votepokal.";
+	private static final String TROPHY_VOTESITE = "minecraft-server.eu";
+
 	private DatabaseManager databaseManager;
 
 	// Soft depend indicators and instances
-	private boolean enableVaultEco = false;
-	private boolean enableVaultPerm = false;
 	private boolean enablePlayerPoints = false;
-
-	private boolean isSpigot = false;
 
 	private Economy economy = null;
 	private PlayerPoints points = null;
 
-	// Our listeners
-	VoteEventListener newVote = null;
+	private volatile boolean configValid = false;
+
+	// players whose trophies are currently being claimed (prevents double payout)
+	private final Set<UUID> claiming = ConcurrentHashMap.newKeySet();
 
 	/**
 	 * Implements the onEnable method invoked when plugin is enabled.
@@ -61,83 +72,63 @@ public class MultiVoteListener extends JavaPlugin {
 	public void onEnable() {
 		if (!new File(getDataFolder(), "config.yml").exists()) {
 			saveResource("config.yml", false);
-			//TODO: Created config message
 		}
 		reloadConfig();
-		if (!loadConfig()) {
+		List<String> configProblems = validateConfig();
+		if (!configProblems.isEmpty()) {
+			configProblems.forEach(problem -> getLogger().severe("Config problem: " + problem));
+			getLogger().severe("Invalid config. Disabling plugin.");
 			this.getServer().getPluginManager().disablePlugin(this);
 			return;
 		}
-		config = getConfig();
+		configValid = true;
 
 		this.databaseManager = new DatabaseManager(this);
 		try {
 			databaseManager.start();
-			databaseManager.runMigration("CREATE TABLE IF NOT EXISTS votes (" +
-					"id INT(11) NOT NULL AUTO_INCREMENT," +
-					"date DATE NOT NULL DEFAULT CURRENT_TIMESTAMP," +
-					"time TIME NOT NULL DEFAULT CURRENT_TIMESTAMP," +
-					"uuid VARCHAR(36) NOT NULL," +
-					"username VARCHAR(36) NOT NULL," +
-					"votesite TEXT NOT NULL, PRIMARY KEY (`id`))");
+			runMigrations();
 		} catch (SQLException e) {
 			getLogger().severe("Failed to initialize database connection pool. Disabling plugin.");
 			getLogger().severe(e.getCause() != null ? e.getCause().getMessage() : e.getMessage());
 			this.getServer().getPluginManager().disablePlugin(this);
 			return;
 		}
-		//TODO: Load config message
 
-		// Check for Vault
-		if (this.getServer().getPluginManager().getPlugin("Vault") != null) {
-			RegisteredServiceProvider<Economy> economyProvider = Bukkit.getServer().getServicesManager().getRegistration(Economy.class);
-			if (economyProvider != null) {
-				economy = economyProvider.getProvider();
-				enableVaultEco = true;
-				Logger.info(Tools.stripColorCodes(getConfig().getString("message_prefix")) + "SoftDependency: Vault - Economy hook found.");
-			} else {
-				enableVaultEco = false;
-				Logger.info(Tools.stripColorCodes(getConfig().getString("message_prefix")) + "SoftDependency: Vault - not found. money reward disabled.");
-			}
+		// Vault is a hard dependency; the economy provider may register later, so it is resolved lazily
+		if (resolveEconomy() != null) {
+			getLogger().info("SoftDependency: Vault - Economy hook found.");
 		} else {
-			Logger.info(Tools.stripColorCodes(getConfig().getString("message_prefix")) + "Dependency: Vault - not found. Disabling MultiVoteListener.");
-			this.getServer().getPluginManager().disablePlugin(this);
-			return;
+			getLogger().info("SoftDependency: Vault - no economy provider yet. Money rewards start working as soon as one registers.");
 		}
 
 		// Check for player points
-		if (this.getServer().getPluginManager().getPlugin("PlayerPoints") != null) {
-			points = (PlayerPoints) this.getServer().getPluginManager().getPlugin("PlayerPoints");
-			if (points != null) {
-				enablePlayerPoints = true;
-				Logger.info(Tools.stripColorCodes(getConfig().getString("message_prefix")) + "SoftDependency: PlayerPoints - found.");
-			}
+		if (this.getServer().getPluginManager().getPlugin("PlayerPoints") instanceof PlayerPoints playerPoints) {
+			points = playerPoints;
+			enablePlayerPoints = true;
+			getLogger().info("SoftDependency: PlayerPoints - found.");
 		} else {
-			Logger.info(Tools.stripColorCodes(getConfig().getString("message_prefix")) + "SoftDependency: PlayerPoints - not found. points reward disabled.");
+			getLogger().info("SoftDependency: PlayerPoints - not found. points reward disabled.");
 		}
 
-		// Check if server is Spigot
-		try {
+		if (isLuckPermsAvailable()) {
+			getLogger().info("SoftDependency: LuckPerms - found.");
+		} else {
+			getLogger().info("SoftDependency: LuckPerms - not found. Vote trophies disabled.");
+		}
 
-			Class.forName("org.bukkit.Bukkit").getMethod("spigot");
-			System.out.println(Tools.stripColorCodes(getConfig().getString("message_prefix")) + "Running on Spigot");
-			isSpigot = true;
-		} catch (NoSuchMethodException cfne) {
-			Logger.info(Tools.stripColorCodes(getConfig().getString("message_prefix")) + "Running on CraftBukkit");
-		} catch (ClassNotFoundException cnfe) {
-			// This condition should not be met at all.
-			// The plugin should instantly crash due to missing Bukkit-API
-			Logger.info(Tools.stripColorCodes(getConfig().getString("message_prefix")) + "No bukkit found at all - disabling");
+		new VoteEventListener(this);
+		PluginCommand command = getCommand("mvote");
+		if (command == null) {
+			getLogger().severe("Command 'mvote' is missing in plugin.yml. Disabling plugin.");
 			this.getServer().getPluginManager().disablePlugin(this);
 			return;
 		}
+		command.setExecutor(new CommandHandler(this));
 
-		this.newVote = new VoteEventListener(this);
-		Objects.requireNonNull(this.getCommand("mvote")).setExecutor(new CommandHandler(this));
-
-		LocalDate today = LocalDate.now();
-		if (today.getDayOfMonth() == 1) {
-			voteCheck(Bukkit.getConsoleSender());
+		// Monthly trophy run: once per month, delayed so that LuckPerms & co. are fully loaded
+		YearMonth currentMonth = YearMonth.now(ZONE);
+		if (LocalDate.now(ZONE).getDayOfMonth() == 1 && !currentMonth.toString().equals(getLastTrophyRun())) {
+			Bukkit.getScheduler().runTaskLater(this, () -> voteCheck(Bukkit.getConsoleSender()), 20L * 30);
 		}
 	}
 
@@ -148,33 +139,93 @@ public class MultiVoteListener extends JavaPlugin {
 		}
 	}
 
-	/**
-	 * Load config file from disk.
-	 * The method handles exceptions that may occur during file load using getConfig()
-	 *
-	 * @return true if config has benn loaded, false on error.
-	 */
-	public boolean loadConfig() {
-		//TODO: Handle invalid configuation file exception
+	private void runMigrations() throws SQLException {
+		databaseManager.runMigration("CREATE TABLE IF NOT EXISTS votes (" +
+				"id INT NOT NULL AUTO_INCREMENT," +
+				"date DATE NOT NULL," +
+				"time TIME NOT NULL," +
+				"uuid VARCHAR(36) NOT NULL," +
+				"username VARCHAR(36) NOT NULL," +
+				"votesite VARCHAR(64) NOT NULL," +
+				"PRIMARY KEY (`id`)," +
+				"UNIQUE KEY uq_vote_per_day (uuid, votesite, date))");
+		// Existing installations: add the unique key afterwards (votesite may still be TEXT, hence the prefix length)
 		try {
-			getConfig();
-			//this.config = YamlConfiguration.loadConfiguration(new File(getDataFolder(), "config.yml"));
-		} catch (Exception e) {
-			Logger.info("[MultiVoteListener] Error in config. Plugin will not be enabled");
-			return false;
+			databaseManager.runMigration("ALTER TABLE votes ADD UNIQUE KEY uq_vote_per_day (uuid, votesite(64), date)");
+			getLogger().info("Added unique key uq_vote_per_day to table 'votes'.");
+		} catch (SQLException e) {
+			// 1061 = duplicate key name -> already present
+			if (e.getErrorCode() != 1061) {
+				getLogger().warning("Could not add unique key to table 'votes' (duplicate rows?): " + e.getMessage()
+						+ " - falling back to the select-before-insert dedup only.");
+			}
 		}
-		return true;
-
 	}
 
 	/**
-	 * Returns the Vault API - Economy used by MultiVoteListener.
+	 * Checks the loaded config for the keys the plugin cannot work without.
 	 *
-	 * @return Vault Instance or null, if Vault is not active
+	 * @return list of human readable problems, empty if the config is usable
+	 */
+	public List<String> validateConfig() {
+		List<String> problems = new ArrayList<>();
+		FileConfiguration cfg = getConfig();
+		if (cfg.getString("message_prefix") == null) {
+			problems.add("'message_prefix' is missing");
+		}
+		if (cfg.getConfigurationSection("messages") == null) {
+			problems.add("'messages' section is missing");
+		}
+		if (cfg.getConfigurationSection("database") == null) {
+			problems.add("'database' section is missing");
+		}
+		ConfigurationSection services = cfg.getConfigurationSection("services");
+		if (services == null) {
+			problems.add("'services' section is missing");
+		} else {
+			for (String id : services.getKeys(false)) {
+				if (services.getString(id + ".name") == null) {
+					problems.add("'services." + id + ".name' is missing");
+				}
+			}
+		}
+		return problems;
+	}
+
+	public boolean isConfigValid() {
+		return configValid;
+	}
+
+	/**
+	 * Reloads config.yml from disk and validates it.
+	 *
+	 * @return list of problems, empty if the config is usable. While the config is invalid votes are ignored.
+	 */
+	public List<String> reloadAndValidateConfig() {
+		reloadConfig();
+		List<String> problems = validateConfig();
+		configValid = problems.isEmpty();
+		return problems;
+	}
+
+	/**
+	 * Returns the Vault economy, resolving it on first use if it has not been registered yet.
+	 *
+	 * @return Economy instance or null if no economy provider is registered
 	 * @see net.milkbowl.vault.economy.Economy
 	 */
 	public Economy getEcoAPI() {
-		return this.economy;
+		return resolveEconomy();
+	}
+
+	private Economy resolveEconomy() {
+		if (economy == null) {
+			RegisteredServiceProvider<Economy> provider = Bukkit.getServicesManager().getRegistration(Economy.class);
+			if (provider != null) {
+				economy = provider.getProvider();
+			}
+		}
+		return economy;
 	}
 
 	public DatabaseManager getDatabaseManager() {
@@ -182,196 +233,244 @@ public class MultiVoteListener extends JavaPlugin {
 	}
 
 	/**
-	 * Returns the Vault API used by MultiVoteListener.
+	 * Returns the PlayerPoints API used by MultiVoteListener.
 	 *
-	 * @return PlayerPoints Instance or null, if Vault is not active
+	 * @return PlayerPoints API or null, if PlayerPoints is not active
 	 * @see org.black_ixx.playerpoints.PlayerPointsAPI
 	 */
 	public PlayerPointsAPI getPointsAPI() {
-		return this.points.getAPI();
+		return this.points != null ? this.points.getAPI() : null;
 	}
 
 	/**
-	 * Indicates if Vault is currently used for Economy
+	 * Indicates if an economy provider is currently available through Vault
 	 *
-	 * @return true, if Vault is used. Otherwise false
+	 * @return true, if money rewards can be paid. Otherwise false
 	 */
 	public boolean isEnabledVaultEco() {
-		return this.enableVaultEco;
-	}
-
-	/**
-	 * Indicates if Vault is currently used for Permissions
-	 *
-	 * @return true, if Vault is used. Otherwise false
-	 */
-	public boolean isEnabledVaultPerm() {
-		return this.enableVaultPerm;
+		return resolveEconomy() != null;
 	}
 
 	/**
 	 * Indicates if PlayerPoints is currently used
 	 *
-	 * @return true, if Vault is used. Otherwise false.
+	 * @return true, if PlayerPoints is used. Otherwise false.
 	 */
 	public boolean isEnabledPoints() {
 		return this.enablePlayerPoints;
 	}
 
-	/**
-	 * Indicates if plugin runs in a Spigot Environment.
-	 * Depending on the type of server (Spigot/CraftBukkit) some extended functionality is used, e.g.
-	 * if running in a Spigot environment the plugin will make use of the Bungee Chat API which is not
-	 * available in CraftBukkit.
-	 *
-	 * @return true, if server is Spigot is used. Otherwise false.
-	 */
-	public boolean isSpigot() {
-		return isSpigot;
-
+	public boolean isLuckPermsAvailable() {
+		return getServer().getPluginManager().getPlugin("LuckPerms") != null
+				&& Bukkit.getServicesManager().getRegistration(LuckPerms.class) != null;
 	}
 
-	public void voteCheck(CommandSender sender) {
-		LocalDate today = LocalDate.now();
-		YearMonth previousMonthOfThisYear = YearMonth.from(today.minusMonths(1));
-		int monthValuePreviousMonth = previousMonthOfThisYear.getMonthValue();
-		int yearValueOfPreviousMonth = previousMonthOfThisYear.getYear();
-		int minDaysNeeded = previousMonthOfThisYear.lengthOfMonth() - 1;
+	private LuckPerms luckPerms() {
+		RegisteredServiceProvider<LuckPerms> provider = Bukkit.getServicesManager().getRegistration(LuckPerms.class);
+		return provider != null ? provider.getProvider() : null;
+	}
 
-		String sql = """
-            SELECT
-            	uuid
-            FROM
-            	votes
-            WHERE
-            	MONTH(date) = ? AND YEAR(date) = ? AND votesite = ?
-            GROUP BY
-            	uuid
-            HAVING
-            	COUNT(DISTINCT DATE(date)) >= ?
-            ORDER BY
-            	uuid DESC;
-            """;
+	private String prefix() {
+		return getConfig().getString("message_prefix", "");
+	}
 
+	private String message(String key) {
+		return Tools.reformatColorCodes(prefix() + getConfig().getString("messages." + key, ""));
+	}
+
+	// ---- monthly trophy state -------------------------------------------------------------------
+
+	private File stateFile() {
+		return new File(getDataFolder(), "state.yml");
+	}
+
+	private String getLastTrophyRun() {
+		return YamlConfiguration.loadConfiguration(stateFile()).getString("last_trophy_run");
+	}
+
+	private synchronized void setLastTrophyRun(String yearMonth) {
+		YamlConfiguration state = YamlConfiguration.loadConfiguration(stateFile());
+		state.set("last_trophy_run", yearMonth);
 		try {
-			getDatabaseManager().executeQuery(sql, stmt -> {
-				stmt.setInt(1, monthValuePreviousMonth);
-				stmt.setInt(2, yearValueOfPreviousMonth);
-				stmt.setString(3, "minecraft-server.eu");
-				stmt.setInt(4, minDaysNeeded);
-			}, rs -> {
-				while (rs.next()) {
-					String uuidString = rs.getString("uuid");
-					setPermissionViaConsole(uuidString, monthValuePreviousMonth, yearValueOfPreviousMonth);
-				}
-				return null;
-			});
-		} catch (SQLException e) {
-			getLogger().severe("Failed to run monthly vote check.");
-			getLogger().severe(e.getMessage());
+			state.save(stateFile());
+		} catch (IOException e) {
+			getLogger().warning("Could not save state.yml: " + e.getMessage());
+		}
+	}
+
+	private static String trophyPermission(int month, int year) {
+		return TROPHY_PERMISSION_PREFIX + month + "_" + year;
+	}
+
+	private String monthName(int month) {
+		return Month.of(month).getDisplayName(TextStyle.FULL, Locale.GERMAN);
+	}
+
+	/**
+	 * Grants the trophy permission for the previous month to every player who voted often enough.
+	 * The database lookup and the LuckPerms updates run asynchronously, the result is sent to the sender afterwards.
+	 */
+	public void voteCheck(CommandSender sender) {
+		LuckPerms lp = luckPerms();
+		if (lp == null) {
+			sender.sendMessage(Tools.reformatColorCodes(prefix() + "&4LuckPerms not found, vote trophies are not available."));
+			return;
 		}
 
-		Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "lp sync");
-		String message = Tools.reformatColorCodes(this.getConfig().getString("message_prefix") + this.getConfig().getString("messages.given_trophies"));
-		Month monthAsEnum = Month.of(monthValuePreviousMonth);
-		String monthName = monthAsEnum.getDisplayName(TextStyle.FULL, Locale.GERMAN);
-		message = message.replaceAll("%month%", monthName);
-		message = message.replaceAll("%year%", yearValueOfPreviousMonth + "");
+		YearMonth previousMonth = YearMonth.now(ZONE).minusMonths(1);
+		int month = previousMonth.getMonthValue();
+		int year = previousMonth.getYear();
+		int minDaysNeeded = previousMonth.lengthOfMonth() - 1;
+		// mark before running so a restart cannot trigger the automatic run again
+		setLastTrophyRun(YearMonth.now(ZONE).toString());
 
-		sender.sendMessage(message);
-	}
+		String sql = """
+				SELECT uuid
+				FROM votes
+				WHERE MONTH(date) = ? AND YEAR(date) = ? AND votesite = ?
+				GROUP BY uuid
+				HAVING COUNT(DISTINCT date) >= ?
+				""";
 
-	public void receiveTrophies(JavaPlugin plugin, UUID playerUUID, CommandSender commandSender) {
-		Player player = Bukkit.getPlayer(playerUUID);
-		if (player == null || !player.isOnline()) {
-			String message = Tools.reformatColorCodes(this.getConfig().getString("message_prefix") + this.getConfig().getString("messages.player_not_online"));
-			commandSender.sendMessage(message);
-		} else{
-
-			ArrayList<String> allTrophyPermissionsOfPlayer = new ArrayList<>();
-
-			String sql = """
-					SELECT permission FROM luckperms_user_permissions WHERE permission LIKE "blockminers.votepokal.%" AND uuid = ?;
-					""";
-
+		Bukkit.getScheduler().runTaskAsynchronously(this, () -> {
+			List<UUID> winners = new ArrayList<>();
 			try {
-				getDatabaseManager().executeQuery(sql, stmt -> stmt.setString(1, playerUUID.toString()), rs -> {
+				getDatabaseManager().executeQuery(sql, stmt -> {
+					stmt.setInt(1, month);
+					stmt.setInt(2, year);
+					stmt.setString(3, TROPHY_VOTESITE);
+					stmt.setInt(4, minDaysNeeded);
+				}, rs -> {
 					while (rs.next()) {
-						String permission = rs.getString("permission");
-						allTrophyPermissionsOfPlayer.add(permission);
+						try {
+							winners.add(UUID.fromString(rs.getString("uuid")));
+						} catch (IllegalArgumentException e) {
+							getLogger().warning("Ignoring invalid uuid in votes table: " + rs.getString("uuid"));
+						}
 					}
 					return null;
 				});
 			} catch (SQLException e) {
-				getLogger().severe("Failed to load trophy permissions for player " + playerUUID + ".");
-				getLogger().severe(e.getMessage());
+				getLogger().severe("Failed to run monthly vote check: " + e.getMessage());
+				Bukkit.getScheduler().runTask(this, () ->
+						sender.sendMessage(Tools.reformatColorCodes(prefix() + "&4Database error during vote check, see console.")));
+				return;
 			}
 
-			if (!allTrophyPermissionsOfPlayer.isEmpty()) {
-				for (String trophyPermission : allTrophyPermissionsOfPlayer) {
-					String monthYearString = trophyPermission.split("\\.")[2];
-					int month = Integer.parseInt(monthYearString.split("_")[0]);
-					int year = Integer.parseInt(monthYearString.split("_")[1]);
-					giveTrophy(playerUUID, month, year);
+			String permission = trophyPermission(month, year);
+			List<CompletableFuture<Void>> updates = new ArrayList<>();
+			for (UUID uuid : winners) {
+				updates.add(lp.getUserManager().modifyUser(uuid, user -> user.data().add(Node.builder(permission).build())));
+			}
+			try {
+				CompletableFuture.allOf(updates.toArray(new CompletableFuture[0])).join();
+			} catch (RuntimeException e) {
+				getLogger().severe("Failed to set trophy permissions: " + e.getMessage());
+			}
+
+			String text = message("given_trophies")
+					.replace("%month%", monthName(month))
+					.replace("%year%", String.valueOf(year));
+			Bukkit.getScheduler().runTask(this, () -> sender.sendMessage(text));
+		});
+	}
+
+	/**
+	 * Pays out all trophies a player has permissions for. The permissions are removed (and saved) before anything is
+	 * paid, and a player can only have one claim in flight, so repeated calls cannot pay twice.
+	 */
+	public void receiveTrophies(UUID playerUUID, CommandSender commandSender) {
+		Player player = Bukkit.getPlayer(playerUUID);
+		if (player == null || !player.isOnline()) {
+			commandSender.sendMessage(message("player_not_online"));
+			return;
+		}
+		LuckPerms lp = luckPerms();
+		if (lp == null) {
+			commandSender.sendMessage(Tools.reformatColorCodes(prefix() + "&4LuckPerms not found, vote trophies are not available."));
+			return;
+		}
+		if (!claiming.add(playerUUID)) {
+			return;
+		}
+
+		lp.getUserManager().loadUser(playerUUID).thenCompose(user -> {
+			List<int[]> claims = new ArrayList<>();
+			List<Node> toRemove = new ArrayList<>();
+			for (PermissionNode node : user.getNodes(NodeType.PERMISSION)) {
+				if (!node.getValue() || node.hasExpired() || !node.getKey().startsWith(TROPHY_PERMISSION_PREFIX)) {
+					continue;
 				}
+				int[] monthYear = parseTrophy(node.getKey().substring(TROPHY_PERMISSION_PREFIX.length()));
+				if (monthYear == null) {
+					getLogger().warning("Ignoring malformed trophy permission: " + node.getKey());
+					continue;
+				}
+				toRemove.add(node);
+				claims.add(monthYear);
 			}
+			toRemove.forEach(node -> user.data().remove(node));
+			return lp.getUserManager().saveUser(user).thenApply(ignored -> claims);
+		}).whenComplete((claims, error) -> Bukkit.getScheduler().runTask(this, () -> {
+			try {
+				if (error != null) {
+					getLogger().severe("Failed to claim trophies for " + playerUUID + ": " + error.getMessage());
+					commandSender.sendMessage(Tools.reformatColorCodes(prefix() + "&4Trophies could not be claimed, see console."));
+					return;
+				}
+				Player online = Bukkit.getPlayer(playerUUID);
+				if (online == null) {
+					// the permissions are already removed, so log the lost claim for manual handling
+					getLogger().warning("Player " + playerUUID + " went offline while claiming " + claims.size() + " trophies.");
+					return;
+				}
+				for (int[] monthYear : claims) {
+					giveTrophy(online, monthYear[0], monthYear[1]);
+				}
+				online.sendMessage(message(claims.isEmpty() ? "not_voted_enough" : "thank_you_for_voting_regularly"));
+			} finally {
+				claiming.remove(playerUUID);
+			}
+		}));
+	}
 
-			String message;
-			if (allTrophyPermissionsOfPlayer.isEmpty()) {
-				message = Tools.reformatColorCodes(this.getConfig().getString("message_prefix") + this.getConfig().getString("messages.not_voted_enough"));
-			} else {
-				message = Tools.reformatColorCodes(this.getConfig().getString("message_prefix") + this.getConfig().getString("messages.thank_you_for_voting_regularly"));
+	/** @return {month, year} or null if the permission suffix is not of the form M_YYYY */
+	private static int[] parseTrophy(String suffix) {
+		String[] parts = suffix.split("_");
+		if (parts.length != 2) {
+			return null;
+		}
+		try {
+			int month = Integer.parseInt(parts[0]);
+			int year = Integer.parseInt(parts[1]);
+			if (month < 1 || month > 12) {
+				return null;
 			}
-			player.sendMessage(message);
+			return new int[] { month, year };
+		} catch (NumberFormatException e) {
+			return null;
 		}
 	}
 
-	private void giveTrophy(UUID playerUUID, int month, int year){
-		OfflinePlayer user = getOfflinePlayer(playerUUID);
-		String username = user.getName();
+	private void giveTrophy(Player player, int month, int year) {
+		String monthName = monthName(month);
 
-		Month monthAsEnum = Month.of(month);
-		String monthName = monthAsEnum.getDisplayName(TextStyle.FULL, Locale.GERMAN);
+		String giveCommand = Tools.reformatColorCodes(getConfig().getString("trophy_head_command", ""))
+				.replace("%player_name%", player.getName())
+				.replace("%month%", monthName)
+				.replace("%year%", String.valueOf(year));
+		Bukkit.dispatchCommand(Bukkit.getConsoleSender(), giveCommand);
 
-		String give_command = Tools.reformatColorCodes(getConfig().getString("trophy_head_command"));
-        assert username != null;
-        give_command = give_command.replaceAll("%player_name%", username);
-		give_command = give_command.replaceAll("%month%", monthName);
-		give_command = give_command.replaceAll("%year%", year + "");
+		player.sendMessage(message("vote_trophy_reward_notice")
+				.replace("%month%", monthName)
+				.replace("%year%", String.valueOf(year)));
 
-		removePermissionViaConsole(playerUUID.toString(),month, year);
-		Player player = Bukkit.getPlayer(playerUUID);
-
-		Bukkit.dispatchCommand(Bukkit.getConsoleSender(), give_command);
-		String message = Tools.reformatColorCodes(this.getConfig().getString("message_prefix") + this.getConfig().getString("messages.vote_trophy_reward_notice"));
-		message = message.replaceAll("%month%", monthName);
-		message = message.replaceAll("%year%", year + "");
-        assert player != null;
-        player.sendMessage(message);
-
-		int money_reward = getConfig().getInt("monthly_vote_reward_money");
-		getEcoAPI().depositPlayer(user,money_reward);
-
-		String money_message = Tools.reformatColorCodes(this.getConfig().getString("message_prefix") + this.getConfig().getString("messages.player_money_reward"));
-		money_message = money_message.replaceAll("%amount%", Objects.requireNonNull(this.getConfig().getString("monthly_vote_reward_money")));
-		player.sendMessage(money_message);
-	}
-
-	public void setPermissionViaConsole(String playerUUIDString, int monthValue, int yearValue) {
-		String playerName = getOfflinePlayer(UUID.fromString(playerUUIDString)).getName();
-		String permission = "blockminers.votepokal." + monthValue + "_" + yearValue;
-		String command = "lp user " + playerName + " permission set " + permission;
-		Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command);
-	}
-
-	public void removePermissionViaConsole(String playerUUIDString, int monthValue, int yearValue) {
-		String playerName = getOfflinePlayer(UUID.fromString(playerUUIDString)).getName();
-		String permission = "blockminers.votepokal." + monthValue + "_" + yearValue;
-		String command = "lp user " + playerName + " permission unset " + permission;
-		Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command);
-		Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "lp sync");
+		int moneyReward = getConfig().getInt("monthly_vote_reward_money");
+		Economy eco = getEcoAPI();
+		if (eco != null && moneyReward > 0) {
+			eco.depositPlayer(player, moneyReward);
+			player.sendMessage(message("player_money_reward").replace("%amount%", String.valueOf(moneyReward)));
+		}
 	}
 
 }
-
-

@@ -7,9 +7,18 @@ api-version: 1.21.11
 
 authors: [ bmack94 ]
 depend: [ Votifier, Vault ]
-softdepend: [ PlayerPoints ]
+softdepend: [ PlayerPoints, LuckPerms, Essentials ]
+
+libraries:
+  - com.zaxxer:HikariCP:5.1.0
+  - com.mysql:mysql-connector-j:9.3.0
 
 commands:
    mvote:
      description: MultiVoteListener Command Interface
      usage: /mvote
+
+permissions:
+  mvote.admin:
+    description: Allows use of all /mvote subcommands
+    default: op

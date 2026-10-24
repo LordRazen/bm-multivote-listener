@@ -2,17 +2,19 @@ package de.bmack.MultiVoteListener.commands;
 
 import java.util.Iterator;
 import java.util.List;
-import java.util.Objects;
 import java.util.UUID;
 
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 
 import de.bmack.MultiVoteListener.MultiVoteListener;
 import de.bmack.MultiVoteListener.Tools;
+import com.vexsoftware.votifier.model.Vote;
+import com.vexsoftware.votifier.model.VotifierEvent;
 import org.jspecify.annotations.NonNull;
 
 import static org.bukkit.Bukkit.getOfflinePlayer;
@@ -42,26 +44,22 @@ public class CommandHandler implements CommandExecutor {
      * @return		true
      */ 
 	public boolean onCommand(@NonNull CommandSender sender, @NonNull Command cmd, @NonNull String commandLabel, String @NonNull [] args) {
-        // Do nothing if sender is not OP or has appropriate permission
-		if(plugin.isEnabledVaultPerm()) {
-			if (!(sender.isOp() || Objects.requireNonNull(Bukkit.getPlayer(String.valueOf(sender))).hasPermission("mvote.admin"))) return true;
+		if (!(sender.isOp() || sender.hasPermission("mvote.admin"))) {
+			sender.sendMessage("§cYou do not have permission to use this command.");
+			return true;
 		}
-		else {
-			if (!(sender.isOp() || sender.hasPermission("mvote.admin"))) return true;
-		}
-		
-		
+
 		// Handle /mvote command
         if (cmd.getName().equalsIgnoreCase("mvote")) {
             if (args.length > 0) {
 				switch (args[0]) {
 					case "reload":
-						try {
-							plugin.reloadConfig();
-							commandResponse(sender, "&4Config reloaded.");
-						} catch (Exception e) {
-							System.out.println("[MultiVoteListener] Error in config. Plugin will not be enabled");
-							commandResponse(sender, "&4Error in your config file.");
+						List<String> problems = plugin.reloadAndValidateConfig();
+						if (problems.isEmpty()) {
+							commandResponse(sender, "&AConfig reloaded.");
+						} else {
+							commandResponse(sender, "&4Error in your config file, votes are ignored until it is fixed:");
+							problems.forEach(problem -> commandResponse(sender, "&4- " + problem));
 						}
 						break;
 					case "status":
@@ -70,10 +68,25 @@ public class CommandHandler implements CommandExecutor {
 					case "services":
 						commandResponse(sender, Tools.getServices(plugin));
 						break;
-					case "receive-trophies":
+					case "testvote":
+							if (args.length > 1) {
+								String service = args.length > 2 ? args[2] : firstServiceName();
+								if (service == null) {
+									commandResponse(sender, "&4No service configured.");
+									break;
+								}
+								Vote vote = new Vote(service, args[1], "127.0.0.1", String.valueOf(System.currentTimeMillis() / 1000));
+								Bukkit.getPluginManager().callEvent(new VotifierEvent(vote));
+								commandResponse(sender, "Test vote for " + args[1] + " on " + service + " fired.");
+							}
+							else {
+								commandResponse(sender, "Usage: /mvote testvote <player> [service]");
+							}
+							break;
+						case "receive-trophies":
 						if(args.length > 1){
 							UUID playerUUID = Bukkit.getOfflinePlayer(args[1]).getUniqueId();
-							plugin.receiveTrophies(plugin, playerUUID, sender);
+							plugin.receiveTrophies(playerUUID, sender);
 						}
 						else{
 							String message = Tools.reformatColorCodes(plugin.getConfig().getString("message_prefix") + plugin.getConfig().getString("messages.usage_receive_trophies"));
@@ -99,6 +112,17 @@ public class CommandHandler implements CommandExecutor {
 	}
 
 	
+	private String firstServiceName() {
+		ConfigurationSection services = plugin.getConfig().getConfigurationSection("services");
+		if (services == null) return null;
+		for (String id : services.getKeys(false)) {
+			if (id.equals("default")) continue;
+			String name = services.getString(id + ".name");
+			if (name != null) return name;
+		}
+		return null;
+	}
+
 	public void commandResponse(CommandSender sender, List<String> responseText) {
 		String prefix = "";
 		if(sender instanceof Player) {

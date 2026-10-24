@@ -19,8 +19,8 @@ import java.sql.Statement;
 public class DatabaseManager {
 
 	private final JavaPlugin plugin;
-	private HikariDataSource dataSource;
-	private boolean ready;
+	private volatile HikariDataSource dataSource;
+	private volatile boolean ready;
 
 	public DatabaseManager(JavaPlugin plugin) {
 		this.plugin = plugin;
@@ -85,14 +85,19 @@ public class DatabaseManager {
 	}
 
 	public boolean isReady() {
-		return this.ready && this.dataSource != null && !this.dataSource.isClosed();
+		HikariDataSource ds = this.dataSource;
+		return this.ready && ds != null && !ds.isClosed();
 	}
 
 	public Connection getConnection() throws SQLException {
 		if (!isReady()) {
 			throw new SQLException("DatabaseManager is not ready.");
 		}
-		return this.dataSource.getConnection();
+		HikariDataSource ds = this.dataSource;
+		if (ds == null) {
+			throw new SQLException("DatabaseManager is not ready.");
+		}
+		return ds.getConnection();
 	}
 
 	public void runMigration(String sql) throws SQLException {
@@ -101,12 +106,15 @@ public class DatabaseManager {
 		}
 	}
 
-	public void executeUpdate(String sql, StatementPreparer statementPreparer) throws SQLException {
+	/**
+	 * @return number of affected rows
+	 */
+	public int executeUpdate(String sql, StatementPreparer statementPreparer) throws SQLException {
 		try (Connection connection = getConnection(); PreparedStatement statement = connection.prepareStatement(sql)) {
 			if (statementPreparer != null) {
 				statementPreparer.accept(statement);
 			}
-			statement.executeUpdate();
+			return statement.executeUpdate();
 		}
 	}
 
